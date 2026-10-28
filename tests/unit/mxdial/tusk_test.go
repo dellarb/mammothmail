@@ -15,27 +15,33 @@ const validManifest = `{
   "schema_version": 1,
   "future_field": {"ignored": true},
   "receivers": [
-    {"id":"antler-1","session_url":"https://antler1.example.test","smtp_hostname":"antler1.example.test","mx_priority":10},
-    {"id":"antler-2","session_url":"https://antler2.example.test","smtp_hostname":"antler2.example.test","mx_priority":20}
+    {"id":"tusk-1","session_url":"https://tusk1.example.test","smtp_hostname":"tusk1.example.test","mx_priority":10},
+    {"id":"tusk-2","session_url":"https://tusk2.example.test","smtp_hostname":"tusk2.example.test","mx_priority":20}
   ]
 }`
 
-func TestEmbeddedAntlerManifestIsValid(t *testing.T) {
+func TestEmbeddedTuskManifestIsValid(t *testing.T) {
 	t.Parallel()
-	receivers := mxdial.EmbeddedAntlerReceivers()
+	receivers := mxdial.EmbeddedTuskReceivers()
 	if len(receivers) != 2 {
 		t.Fatalf("embedded manifest receivers = %d, want 2", len(receivers))
 	}
-	if receivers[0].SessionURL != "https://antler1.hgolabs.com" || receivers[0].MXPriority != 10 {
+	if receivers[0].SessionURL != "https://tusk1.hgolabs.com" || receivers[0].MXPriority != 10 {
 		t.Fatalf("unexpected first receiver: %+v", receivers[0])
+	}
+	if receivers[1].SessionURL != "https://tusk2.hgolabs.com" || receivers[1].MXPriority != 10 {
+		t.Fatalf("unexpected second receiver: %+v", receivers[1])
+	}
+	if mxdial.TuskManifestURL != "https://raw.githubusercontent.com/dellarb/mailmoose/main/internal/transport/mxdial/endpoints.json" {
+		t.Fatalf("unexpected live manifest: %s", mxdial.TuskManifestURL)
 	}
 }
 
-func TestParseAntlerManifestValidates(t *testing.T) {
+func TestParseTuskManifestValidates(t *testing.T) {
 	t.Parallel()
 	// Unknown fields are tolerated so the hosted document can grow without
 	// breaking older cores; known fields are still validated strictly.
-	if _, err := mxdial.ParseAntlerManifest([]byte(validManifest)); err != nil {
+	if _, err := mxdial.ParseTuskManifest([]byte(validManifest)); err != nil {
 		t.Fatalf("valid manifest with unknown field rejected: %v", err)
 	}
 	for name, raw := range map[string]string{
@@ -50,18 +56,18 @@ func TestParseAntlerManifestValidates(t *testing.T) {
 		"duplicate id":       `{"schema_version":1,"receivers":[{"id":"a","session_url":"https://a.test","smtp_hostname":"a.test","mx_priority":10},{"id":"a","session_url":"https://b.test","smtp_hostname":"b.test","mx_priority":20}]}`,
 	} {
 		t.Run(name, func(t *testing.T) {
-			if _, err := mxdial.ParseAntlerManifest([]byte(raw)); err == nil {
+			if _, err := mxdial.ParseTuskManifest([]byte(raw)); err == nil {
 				t.Fatal("expected a validation error")
 			}
 		})
 	}
 }
 
-// TestAntlerResolverFetchesAndFallsBack proves the live fetch is used, cached,
+// TestTuskResolverFetchesAndFallsBack proves the live fetch is used, cached,
 // and that a fetch failure falls back to the last known good copy rather than
 // failing setup. Each attempt reports where its set came from, so setup can say
 // whether it reached GitHub.
-func TestAntlerResolverFetchesAndFallsBack(t *testing.T) {
+func TestTuskResolverFetchesAndFallsBack(t *testing.T) {
 	t.Parallel()
 	var fail atomic.Bool
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -73,15 +79,15 @@ func TestAntlerResolverFetchesAndFallsBack(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	resolver := &mxdial.AntlerResolver{URL: srv.URL, Client: srv.Client(), TTL: time.Minute}
+	resolver := &mxdial.TuskResolver{URL: srv.URL, Client: srv.Client(), TTL: time.Minute}
 	got, err := resolver.Receivers(context.Background())
 	if err != nil || len(got.Receivers) != 2 {
 		t.Fatalf("fetch: %v %+v", err, got)
 	}
-	if got.Source != mxdial.AntlerSourceGitHub || got.FetchedAt.IsZero() {
+	if got.Source != mxdial.TuskSourceGitHub || got.FetchedAt.IsZero() {
 		t.Fatalf("live fetch source = %q (fetched %v), want github with a fetch time", got.Source, got.FetchedAt)
 	}
-	if got.Receivers[0].SessionURL != "https://antler1.example.test" {
+	if got.Receivers[0].SessionURL != "https://tusk1.example.test" {
 		t.Fatalf("live manifest not used: %+v", got.Receivers[0])
 	}
 
@@ -93,29 +99,29 @@ func TestAntlerResolverFetchesAndFallsBack(t *testing.T) {
 	if err != nil || len(got.Receivers) != 2 {
 		t.Fatalf("cached fallback: %v %+v", err, got)
 	}
-	if got.Source != mxdial.AntlerSourceCache || got.FetchedAt.IsZero() {
+	if got.Source != mxdial.TuskSourceCache || got.FetchedAt.IsZero() {
 		t.Fatalf("cached fallback source = %q (fetched %v), want cache with the original fetch time", got.Source, got.FetchedAt)
 	}
 }
 
-// TestAntlerResolverUsesEmbeddedWhenNeverFetched proves setup still works with
+// TestTuskResolverUsesEmbeddedWhenNeverFetched proves setup still works with
 // no network at all: the embedded manifest is used, and the set says so and
 // carries the fetch failure that forced it.
-func TestAntlerResolverUsesEmbeddedWhenNeverFetched(t *testing.T) {
+func TestTuskResolverUsesEmbeddedWhenNeverFetched(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "down", http.StatusBadGateway)
 	}))
 	defer srv.Close()
-	resolver := &mxdial.AntlerResolver{URL: srv.URL, Client: srv.Client()}
+	resolver := &mxdial.TuskResolver{URL: srv.URL, Client: srv.Client()}
 	got, err := resolver.Receivers(context.Background())
 	if err != nil {
 		t.Fatalf("embedded fallback: %v", err)
 	}
-	if got.Source != mxdial.AntlerSourceEmbedded || got.Err == nil || !got.FetchedAt.IsZero() {
+	if got.Source != mxdial.TuskSourceEmbedded || got.Err == nil || !got.FetchedAt.IsZero() {
 		t.Fatalf("embedded fallback source = %q (err %v, fetched %v), want embedded with the fetch error and no time", got.Source, got.Err, got.FetchedAt)
 	}
-	if len(got.Receivers) != 2 || got.Receivers[0].SessionURL != "https://antler1.hgolabs.com" {
+	if len(got.Receivers) != 2 || got.Receivers[0].SessionURL != "https://tusk1.hgolabs.com" {
 		t.Fatalf("embedded manifest not used: %+v", got.Receivers)
 	}
 }

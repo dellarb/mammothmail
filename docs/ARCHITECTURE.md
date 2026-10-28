@@ -7,7 +7,7 @@ MailMoose is a self-hosted Go application with a web interface, REST API, SQLite
 ```text
 Incoming mail                         Existing mailboxes
 ├── Direct MX (SMTP)                  ├── Gmail / Google
-├── Antler MX (hosted receiver)       ├── Microsoft / Outlook
+├── Tusk MX (hosted receiver)       ├── Microsoft / Outlook
 ├── Mailgun / Resend / Postmark       ├── One / Gmail
 └── Cloudflare Email Routing         └── IMAP + SMTP
              │                                   │
@@ -25,7 +25,7 @@ Incoming mail                         Existing mailboxes
                (Hermes, OpenClaw, REST)
 ```
 
-Direct MX can use the SMTP receiver included with MailMoose. Antler MX receives SMTP on a hosted receiver while MailMoose connects outbound to it over encrypted HTTP/2. Other providers deliver through authenticated webhooks. Connected mailboxes remain hosted by their original providers: MailMoose indexes metadata and retrieves bodies when required.
+Direct MX can use the SMTP receiver included with MailMoose. Tusk MX receives SMTP on a hosted receiver while MailMoose connects outbound to it over encrypted HTTP/2. Other providers deliver through authenticated webhooks. Connected mailboxes remain hosted by their original providers: MailMoose indexes metadata and retrieves bodies when required.
 
 The standard deployment uses one application container. A separate SMTP receiver is optional for more advanced deployments. The optional dedicated receiver HTTP listener runs in the same application process. See [Self-hosting](SELFHOSTING.md) and [Email providers](EMAIL_PROVIDERS.md).
 

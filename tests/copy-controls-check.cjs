@@ -22,8 +22,8 @@ const dataCopyStart = source.lastIndexOf('(function () {', dataCopyMarker);
 const dataCopyEnd = source.indexOf('\n})();', dataCopyMarker) + '\n})();'.length;
 assert.ok(helperMarker >= 0 && dataCopyMarker >= 0, 'copy modules are present');
 
-const antlerStart = source.indexOf("document.querySelectorAll('form[data-antler-domain]')");
-assert.ok(antlerStart > dataCopyStart, 'data-copy controls are wired before optional Antler setup');
+const tuskStart = source.indexOf("document.querySelectorAll('form[data-tusk-domain]')");
+assert.ok(tuskStart > dataCopyStart, 'data-copy controls are wired before optional Tusk setup');
 
 class Element {
   constructor(tagName = 'DIV') {

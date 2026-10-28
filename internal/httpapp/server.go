@@ -71,11 +71,11 @@ var bashClient []byte
 //go:embed assets/curl-cookbook.txt
 var curlCookbook []byte
 
-// The Antler MX mail-flow diagram shown in the receiving wizard. Kept in step
-// with the docs copy at assets/antler-mx-diagram.svg (docs/EMAIL_PROVIDERS.md).
+// The Tusk MX mail-flow diagram shown in the receiving wizard. Kept in step
+// with the docs copy at assets/tusk-mx-diagram.svg (docs/EMAIL_PROVIDERS.md).
 //
-//go:embed assets/antler-mx-diagram.svg
-var antlerMXDiagramSVG []byte
+//go:embed assets/tusk-mx-diagram.svg
+var tuskMXDiagramSVG []byte
 
 type Server struct {
 	Service         *app.Service
@@ -190,7 +190,7 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("GET /assets/logo-horizontal.png", s.showLogo)
 	m.HandleFunc("GET /assets/hermes-connector.png", s.showHermesConnectorIcon)
 	m.HandleFunc("GET /assets/openclaw-connector.png", s.showOpenClawConnectorIcon)
-	m.HandleFunc("GET /assets/antler-mx-diagram.svg", s.showAntlerMXDiagram)
+	m.HandleFunc("GET /assets/tusk-mx-diagram.svg", s.showTuskMXDiagram)
 	m.HandleFunc("GET /favicon.ico", s.showFaviconICO)
 	m.HandleFunc("GET /favicon-16x16.png", s.showFavicon16)
 	m.HandleFunc("GET /favicon-32x32.png", s.showFavicon32)
@@ -265,7 +265,7 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("GET /ui/domains/{id}/receiving/worker", s.withSession(s.uiDomainReceivingWorker))
 	m.HandleFunc("GET /ui/domains/{id}/receiving/setup", s.withSession(s.apiDomainReceiving))
 	m.HandleFunc("PUT /ui/domains/{id}/receiving/setup", s.withSession(s.withCSRF(s.apiDomainReceiving)))
-	m.HandleFunc("POST /ui/domains/{id}/receiving/setup", s.withSession(s.withCSRF(s.uiAntlerSettings)))
+	m.HandleFunc("POST /ui/domains/{id}/receiving/setup", s.withSession(s.withCSRF(s.uiTuskSettings)))
 	m.HandleFunc("POST /ui/domains/{id}/receiving/clear", s.withSession(s.withCSRF(s.uiDomainReceivingClear)))
 	m.HandleFunc("POST /ui/domains/{id}/receiving/regenerate", s.withSession(s.withCSRF(s.uiDomainReceivingRegenerate)))
 	m.HandleFunc("GET /ui/domains/{id}/sending/deliveries", s.withSession(s.domainDeliveries))
@@ -703,8 +703,8 @@ func (s *Server) showHermesConnectorIcon(w http.ResponseWriter, r *http.Request)
 func (s *Server) showOpenClawConnectorIcon(w http.ResponseWriter, r *http.Request) {
 	serveBlob(w, "image/png", "public, max-age=86400", openClawConnectorPNG)
 }
-func (s *Server) showAntlerMXDiagram(w http.ResponseWriter, r *http.Request) {
-	serveBlob(w, "image/svg+xml", "public, max-age=31536000, immutable", antlerMXDiagramSVG)
+func (s *Server) showTuskMXDiagram(w http.ResponseWriter, r *http.Request) {
+	serveBlob(w, "image/svg+xml", "public, max-age=31536000, immutable", tuskMXDiagramSVG)
 }
 func (s *Server) showFaviconICO(w http.ResponseWriter, r *http.Request) {
 	serveBlob(w, "image/x-icon", "public, max-age=86400", faviconICO)

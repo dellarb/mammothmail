@@ -52,7 +52,7 @@ func (r recordingResolver) LookupTXT(_ context.Context, name string) ([]string, 
 }
 
 func TestCheckMXReportsUnexpectedHosts(t *testing.T) {
-	expected := []string{"antler1.example.test", "antler2.example.test"}
+	expected := []string{"tusk1.example.test", "tusk2.example.test"}
 	for _, tc := range []struct {
 		name      string
 		published []*net.MX
@@ -62,15 +62,15 @@ func TestCheckMXReportsUnexpectedHosts(t *testing.T) {
 	}{
 		{
 			name:      "only our receivers",
-			published: []*net.MX{{Host: "antler1.example.test.", Pref: 10}, {Host: "antler2.example.test.", Pref: 20}},
+			published: []*net.MX{{Host: "tusk1.example.test.", Pref: 10}, {Host: "tusk2.example.test.", Pref: 20}},
 			wantState: "ok",
-			wantMatch: []string{"antler1.example.test", "antler2.example.test"},
+			wantMatch: []string{"tusk1.example.test", "tusk2.example.test"},
 		},
 		{
 			name:      "one receiver plus a rogue",
-			published: []*net.MX{{Host: "antler1.example.test.", Pref: 10}, {Host: "old.example.test.", Pref: 20}},
+			published: []*net.MX{{Host: "tusk1.example.test.", Pref: 10}, {Host: "old.example.test.", Pref: 20}},
 			wantState: "ok",
-			wantMatch: []string{"antler1.example.test"},
+			wantMatch: []string{"tusk1.example.test"},
 			wantExtra: []string{"old.example.test"},
 		},
 		{
@@ -81,9 +81,9 @@ func TestCheckMXReportsUnexpectedHosts(t *testing.T) {
 		},
 		{
 			name:      "case and trailing dot are normalized",
-			published: []*net.MX{{Host: "ANTLER1.Example.Test.", Pref: 10}, {Host: "Old.Example.Test.", Pref: 20}},
+			published: []*net.MX{{Host: "TUSK1.Example.Test.", Pref: 10}, {Host: "Old.Example.Test.", Pref: 20}},
 			wantState: "ok",
-			wantMatch: []string{"antler1.example.test"},
+			wantMatch: []string{"tusk1.example.test"},
 			wantExtra: []string{"old.example.test"},
 		},
 		{
@@ -115,7 +115,7 @@ func TestCheckMXReportsUnexpectedHosts(t *testing.T) {
 // completed reads as dns_error. Presenting the second as the first would tell an
 // operator to create a record they may already have published.
 func TestCheckMXAbsentIsNotFoundNotDNSError(t *testing.T) {
-	expected := []string{"antler1.example.test"}
+	expected := []string{"tusk1.example.test"}
 
 	notFound := CheckMX(context.Background(), staticResolver{mxE: &net.DNSError{IsNotFound: true, Name: "example.test"}}, "example.test", expected)
 	if notFound.State != StateNotFound {
@@ -140,7 +140,7 @@ func TestCheckMXAbsentIsNotFoundNotDNSError(t *testing.T) {
 func TestCheckMXQueriesAbsoluteName(t *testing.T) {
 	var got string
 	res := recordingResolver{mx: func(name string) { got = name }}
-	CheckMX(context.Background(), res, "example.test", []string{"antler1.example.test"})
+	CheckMX(context.Background(), res, "example.test", []string{"tusk1.example.test"})
 	if want := "example.test."; got != want {
 		t.Fatalf("MX lookup queried %q, want %q", got, want)
 	}

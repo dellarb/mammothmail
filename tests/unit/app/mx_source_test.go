@@ -16,24 +16,24 @@ import (
 
 // TestMXSourceLabelPerFamily locks in the activity-log source label each MX
 // receiving family is stamped with: the short provider name for Direct MX and
-// Remote MX, and "Antler: <host>" for an Antler Dial MX receiver (resolved from
+// Remote MX, and "Tusk: <host>" for a Tusk Dial MX receiver (resolved from
 // the saved receiver snapshot, not hard-coded).
 func TestMXSourceLabelPerFamily(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	t.Run("antler names the concrete receiver", func(t *testing.T) {
+	t.Run("tusk names the concrete receiver", func(t *testing.T) {
 		svc, u, d := newMXServiceWithOutboundPolicy(t, true)
 		box := createMXInbox(t, svc, u.AccountID, d.ID)
-		svc.AntlerEndpoints = &stubAntler{receivers: antlerReceivers()}
+		svc.TuskEndpoints = &stubTusk{receivers: tuskReceivers()}
 		if _, _, err := svc.SaveDomainReceivingConfig(ctx, u.AccountID, d.ID, "dialmx", map[string]any{
-			"service": mxdial.ServiceAntler, "contact_email": "ops@example.test",
+			"service": mxdial.ServiceTusk, "contact_email": "ops@example.test",
 		}, false); err != nil {
 			t.Fatal(err)
 		}
-		src := ingestDialMX(t, svc, box, "https://antler2.example.test")
-		if src != "Antler: antler2.example.test" {
-			t.Fatalf("antler source = %q", src)
+		src := ingestDialMX(t, svc, box, "https://tusk2.example.test")
+		if src != "Tusk: tusk2.example.test" {
+			t.Fatalf("tusk source = %q", src)
 		}
 	})
 
@@ -133,7 +133,7 @@ func createMXInbox(t *testing.T, svc *app.Service, accountID, domainID string) m
 // returning the source label snapshotted on the resulting activity row.
 func ingestDialMX(t *testing.T, svc *app.Service, box model.Inbox, receiverURL string) string {
 	t.Helper()
-	raw := "From: Sender <sender@outside.test>\r\nTo: " + box.Address + "\r\nSubject: antler\r\nMessage-ID: <antler@test>\r\nDate: Mon, 07 Sep 2026 10:00:00 +0000\r\n\r\nbody"
+	raw := "From: Sender <sender@outside.test>\r\nTo: " + box.Address + "\r\nSubject: tusk\r\nMessage-ID: <tusk@test>\r\nDate: Mon, 07 Sep 2026 10:00:00 +0000\r\n\r\nbody"
 	in := app.MXIngestInput{
 		Recipients:    []string{box.Address},
 		EnvelopeFrom:  "sender@outside.test",

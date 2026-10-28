@@ -85,15 +85,15 @@ func TestDNSWatcherDemandCoalesces(t *testing.T) {
 	t.Parallel()
 	core, _ := dialMXDomain(t, "example.test", "hermes")
 	ctx := context.Background()
-	core.svc.AntlerEndpoints = fixedAntlerReceivers{{ID: "antler-1", SessionURL: "https://antler1.example.test", SMTPHostname: "antler1.example.test", MXPriority: 10}}
+	core.svc.TuskEndpoints = fixedTuskReceivers{{ID: "tusk-1", SessionURL: "https://tusk1.example.test", SMTPHostname: "tusk1.example.test", MXPriority: 10}}
 	if _, _, err := core.svc.SaveDomainReceivingConfig(ctx, core.user.AccountID, core.domain.ID, "dialmx", map[string]any{
-		"service": mxdial.ServiceAntler, "contact_email": "ops@example.test",
+		"service": mxdial.ServiceTusk, "contact_email": "ops@example.test",
 	}, false); err != nil {
-		t.Fatalf("antler save: %v", err)
+		t.Fatalf("tusk save: %v", err)
 	}
 
 	res := &countingResolver{}
-	res.setMX("antler1.example.test.")
+	res.setMX("tusk1.example.test.")
 	w := app.NewDNSWatcher(core.svc, res)
 	core.svc.DNS = w
 	// The save already requested a check; run it so checkedAt is set.
@@ -120,14 +120,14 @@ func TestDNSWatcherRequestCheckForces(t *testing.T) {
 	t.Parallel()
 	core, _ := dialMXDomain(t, "example.test", "hermes")
 	ctx := context.Background()
-	core.svc.AntlerEndpoints = fixedAntlerReceivers{{ID: "antler-1", SessionURL: "https://antler1.example.test", SMTPHostname: "antler1.example.test", MXPriority: 10}}
+	core.svc.TuskEndpoints = fixedTuskReceivers{{ID: "tusk-1", SessionURL: "https://tusk1.example.test", SMTPHostname: "tusk1.example.test", MXPriority: 10}}
 	if _, _, err := core.svc.SaveDomainReceivingConfig(ctx, core.user.AccountID, core.domain.ID, "dialmx", map[string]any{
-		"service": mxdial.ServiceAntler, "contact_email": "ops@example.test",
+		"service": mxdial.ServiceTusk, "contact_email": "ops@example.test",
 	}, false); err != nil {
-		t.Fatalf("antler save: %v", err)
+		t.Fatalf("tusk save: %v", err)
 	}
 	res := &countingResolver{}
-	res.setMX("antler1.example.test.")
+	res.setMX("tusk1.example.test.")
 	w := app.NewDNSWatcher(core.svc, res)
 	core.svc.DNS = w
 	w.CheckOnce(ctx)
@@ -148,11 +148,11 @@ func TestDNSWatcherPublishesDNSChanges(t *testing.T) {
 	t.Parallel()
 	core, _ := dialMXDomain(t, "example.test", "hermes")
 	ctx := context.Background()
-	core.svc.AntlerEndpoints = fixedAntlerReceivers{{ID: "antler-1", SessionURL: "https://antler1.example.test", SMTPHostname: "antler1.example.test", MXPriority: 10}}
+	core.svc.TuskEndpoints = fixedTuskReceivers{{ID: "tusk-1", SessionURL: "https://tusk1.example.test", SMTPHostname: "tusk1.example.test", MXPriority: 10}}
 	if _, _, err := core.svc.SaveDomainReceivingConfig(ctx, core.user.AccountID, core.domain.ID, "dialmx", map[string]any{
-		"service": mxdial.ServiceAntler, "contact_email": "ops@example.test",
+		"service": mxdial.ServiceTusk, "contact_email": "ops@example.test",
 	}, false); err != nil {
-		t.Fatalf("antler save: %v", err)
+		t.Fatalf("tusk save: %v", err)
 	}
 	cred, err := core.svc.Store.GetDialMXCredential(ctx, core.user.AccountID, core.domain.ID)
 	if err != nil {
@@ -161,7 +161,7 @@ func TestDNSWatcherPublishesDNSChanges(t *testing.T) {
 	pub, _ := base64.RawURLEncoding.DecodeString(cred.PublicKey)
 
 	res := &switchDNSResolver{}
-	res.setMX("antler1.example.test.")
+	res.setMX("tusk1.example.test.")
 	res.setTXT(mxwire.DomainTXT(cred.KeyID, pub))
 	w := app.NewDNSWatcher(core.svc, res)
 	core.svc.DNS = w
@@ -194,7 +194,7 @@ func TestDNSWatcherPublishesDNSChanges(t *testing.T) {
 
 	// A rogue MX record appears: the MX verdict gains an unexpected host and one
 	// transient event carries it.
-	res.setMX("antler1.example.test.", "old.example.test.")
+	res.setMX("tusk1.example.test.", "old.example.test.")
 	w.CheckOnce(ctx)
 	hosts, ok := core.svc.ExtraMXState(core.domain.ID)
 	if !ok || len(hosts) != 1 || hosts[0] != "old.example.test" {
@@ -239,13 +239,13 @@ func TestDNSWatcherPublishesDNSChanges(t *testing.T) {
 	}
 }
 
-// fixedAntlerReceivers is a deterministic Antler endpoint resolver for the watcher.
-type fixedAntlerReceivers []mxdial.AntlerReceiver
+// fixedTuskReceivers is a deterministic Tusk endpoint resolver for the watcher.
+type fixedTuskReceivers []mxdial.TuskReceiver
 
-func (f fixedAntlerReceivers) Receivers(context.Context) (mxdial.AntlerEndpointSet, error) {
-	return mxdial.AntlerEndpointSet{
+func (f fixedTuskReceivers) Receivers(context.Context) (mxdial.TuskEndpointSet, error) {
+	return mxdial.TuskEndpointSet{
 		Receivers: f,
-		Source:    mxdial.AntlerSourceGitHub,
+		Source:    mxdial.TuskSourceGitHub,
 		FetchedAt: time.Date(2026, 10, 18, 5, 12, 3, 0, time.UTC),
 	}, nil
 }
@@ -265,11 +265,11 @@ func TestDNSWatcherKeepsWarningWhenLookupFails(t *testing.T) {
 	t.Parallel()
 	core, _ := dialMXDomain(t, "example.test", "hermes")
 	ctx := context.Background()
-	core.svc.AntlerEndpoints = fixedAntlerReceivers{{ID: "antler-1", SessionURL: "https://antler1.example.test", SMTPHostname: "antler1.example.test", MXPriority: 10}}
+	core.svc.TuskEndpoints = fixedTuskReceivers{{ID: "tusk-1", SessionURL: "https://tusk1.example.test", SMTPHostname: "tusk1.example.test", MXPriority: 10}}
 	if _, _, err := core.svc.SaveDomainReceivingConfig(ctx, core.user.AccountID, core.domain.ID, "dialmx", map[string]any{
-		"service": mxdial.ServiceAntler, "contact_email": "ops@example.test",
+		"service": mxdial.ServiceTusk, "contact_email": "ops@example.test",
 	}, false); err != nil {
-		t.Fatalf("antler save: %v", err)
+		t.Fatalf("tusk save: %v", err)
 	}
 	cred, err := core.svc.Store.GetDialMXCredential(ctx, core.user.AccountID, core.domain.ID)
 	if err != nil {
@@ -278,7 +278,7 @@ func TestDNSWatcherKeepsWarningWhenLookupFails(t *testing.T) {
 	pub, _ := base64.RawURLEncoding.DecodeString(cred.PublicKey)
 
 	res := &switchDNSResolver{}
-	res.setMX("antler1.example.test.", "old.example.test.")
+	res.setMX("tusk1.example.test.", "old.example.test.")
 	res.setTXT(mxwire.DomainTXT(cred.KeyID, pub))
 	w := app.NewDNSWatcher(core.svc, res)
 	core.svc.DNS = w

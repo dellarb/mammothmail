@@ -1,5 +1,5 @@
-// Dependency-free interaction checks for the real Antler dialog JavaScript.
-// Run: node tests/antler-wizard-check.cjs
+// Dependency-free interaction checks for the real Tusk dialog JavaScript.
+// Run: node tests/tusk-wizard-check.cjs
 //
 // The Go suite cannot observe what actually breaks in this dialog: which timer
 // refreshes which step, how many listeners end up on the shared SSE stream,
@@ -20,15 +20,15 @@ const HAVE = {
   // S7: wizard steps 1-2 poll every 10s with a visible countdown.
   wizardCountdown: true
 };
-if (process.env.ANTLER_CHECK_CAPS) {
-  for (const cap of process.env.ANTLER_CHECK_CAPS.split(',')) {
+if (process.env.TUSK_CHECK_CAPS) {
+  for (const cap of process.env.TUSK_CHECK_CAPS.split(',')) {
     if (cap.trim()) { HAVE[cap.trim()] = true; }
   }
 }
-const start = source.indexOf('(function () {\n  document.querySelectorAll(\'form[data-antler-domain]\')');
+const start = source.indexOf('(function () {\n  document.querySelectorAll(\'form[data-tusk-domain]\')');
 const end = source.indexOf('\n(function () {', start + 1);
 if (start < 0 || end < 0) {
-  throw new Error('could not locate the Antler dialog closure in app.js');
+  throw new Error('could not locate the Tusk dialog closure in app.js');
 }
 
 // Element is a small DOM stand-in: exactly the surface the closure touches.
@@ -94,8 +94,8 @@ class Element {
   closest(selector) { return (this.closestMap && this.closestMap[selector]) || this.closestNode || null; }
   querySelector(selector) { return this.nodes[selector]; }
   querySelectorAll(selector) {
-    if (selector === '[data-antler-step]') { return this.panels; }
-    if (selector === 'h3, [data-antler-step] > p') { return this.headings; }
+    if (selector === '[data-tusk-step]') { return this.panels; }
+    if (selector === 'h3, [data-tusk-step] > p') { return this.headings; }
     return [];
   }
   get firstChild() { return this.children[0]; }
@@ -104,21 +104,21 @@ class Element {
     this.headings = [];
     this.panels.forEach((panel, i) => {
       panel.nodes['h3'] = new Element('H3');
-      this.nodes['[data-antler-step="' + i + '"]'] = panel;
-      this.nodes['[data-antler-step="' + i + '"] h3'] = panel.nodes['h3'];
+      this.nodes['[data-tusk-step="' + i + '"]'] = panel;
+      this.nodes['[data-tusk-step="' + i + '"] h3'] = panel.nodes['h3'];
       this.headings.push(panel.nodes['h3']);
       // The contact step has no description paragraph in the real wizard
       // markup. Saved-status initialization must tolerate that optional node.
       if (i !== 0) {
         panel.nodes['p'] = new Element('P');
-        this.nodes['[data-antler-step="' + i + '"] p'] = panel.nodes['p'];
-        this.nodes['[data-antler-step="' + i + '"] > p'] = panel.nodes['p'];
+        this.nodes['[data-tusk-step="' + i + '"] p'] = panel.nodes['p'];
+        this.nodes['[data-tusk-step="' + i + '"] > p'] = panel.nodes['p'];
         this.headings.push(panel.nodes['p']);
       }
     });
-    this.nodes['.antler-custom-urls'] = new Element('INPUT');
+    this.nodes['.tusk-custom-urls'] = new Element('INPUT');
     for (const name of ['progress', 'records', 'receivers', 'error']) {
-      this.nodes['.antler-' + name] = new Element();
+      this.nodes['.tusk-' + name] = new Element();
     }
     // The check row contains its note: the note carries the countdown text and the
     // row is what the dialog shows or hides. The manifest line lives in the same
@@ -130,9 +130,9 @@ class Element {
     const manifestNote = new Element('P');
     manifestNote.hidden = true;
     checks.appendChild(manifestNote);
-    this.nodes['.antler-checks'] = checks;
-    this.nodes['.antler-check-note'] = note;
-    this.nodes['.antler-manifest-note'] = manifestNote;
+    this.nodes['.tusk-checks'] = checks;
+    this.nodes['.tusk-check-note'] = note;
+    this.nodes['.tusk-manifest-note'] = manifestNote;
   }
 }
 
@@ -166,22 +166,22 @@ function harness(mode) {
   dlg.open = true;
   dlg.close = () => { dlg.open = false; dlg.emit('close'); };
   const form = new Element('FORM');
-  form.dataset.antlerDomain = 'domain-1';
-  form.dataset.antlerDomainName = mode === 'subdomain' ? 'mail.example.com' : 'example.com';
+  form.dataset.tuskDomain = 'domain-1';
+  form.dataset.tuskDomainName = mode === 'subdomain' ? 'mail.example.com' : 'example.com';
   // A subdomain added standalone (not linked as an inherited child) carries no
   // parent domain. The record-name logic must not depend on that link: it is
   // exactly the case that used to render "@" on a subdomain.
-  if (mode === 'subdomain') { form.dataset.antlerParent = ''; }
-  form.dataset.antlerConnectors = JSON.stringify(mxList);
-  form.dataset.antlerStatus = JSON.stringify(seedStatus);
-  form.dataset.antlerDns = JSON.stringify([{ kind: 'mx', state: 'not_found' }, { kind: 'txt', state: 'not_found' }]);
-  form.dataset.antlerInstructions = JSON.stringify({ txt_name: '_mailmoose-mx.example.com', txt_value: 'public-key', mx: mxList });
+  if (mode === 'subdomain') { form.dataset.tuskParent = ''; }
+  form.dataset.tuskConnectors = JSON.stringify(mxList);
+  form.dataset.tuskStatus = JSON.stringify(seedStatus);
+  form.dataset.tuskDns = JSON.stringify([{ kind: 'mx', state: 'not_found' }, { kind: 'txt', state: 'not_found' }]);
+  form.dataset.tuskInstructions = JSON.stringify({ txt_name: '_mailmoose-mx.example.com', txt_value: 'public-key', mx: mxList });
   form.closestMap = { dialog: dlg };
   const provider = new Element('SELECT');
   provider.value = 'dialmx';
   const group = new Element('DIV');
   const service = new Element('SELECT');
-  service.value = mode === 'custom' ? 'custom' : 'antler';
+  service.value = mode === 'custom' ? 'custom' : 'tusk';
   service.previousElementSibling = new Element('LABEL');
   const email = new Element('INPUT');
   email.value = 'ops@example.com';
@@ -204,7 +204,7 @@ function harness(mode) {
   if (mode === 'status' || mode === 'status-two') { dlg.nodes['.dialmx-setup'] = new Element('SECTION'); }
   const rotate = new Element('FORM');
   rotate.nodes.button = new Element('BUTTON');
-  dlg.nodes['form[data-antler-regenerate]'] = rotate;
+  dlg.nodes['form[data-tusk-regenerate]'] = rotate;
   const workerRegenerate = new Element('FORM');
   workerRegenerate.nodes.button = new Element('BUTTON');
   workerRegenerate.nodes.button.className = 'amber';
@@ -229,7 +229,7 @@ function harness(mode) {
     provider: mode === 'status' || mode === 'status-two' ? 'dialmx' : '',
     config: {
       enforcement: enforcement.value || 'moderate',
-      service: service.value === 'custom' ? 'custom' : 'antler',
+      service: service.value === 'custom' ? 'custom' : 'tusk',
       contact_email: 'ops@example.com'
     },
     status: world.statuses,
@@ -269,7 +269,7 @@ function harness(mode) {
      mailmooseEventsSource: new Element(),
     // The real app.js installs window.mailmooseCopy (assets/app.js) and every
     // copy control routes through it. The closure under test calls
-    // window.mailmooseCopy.wire(btn, opts) while building the Antler
+    // window.mailmooseCopy.wire(btn, opts) while building the Tusk
     // remediation block, so the harness must provide the same surface or that
     // path throws before the block is built. Behaviour mirrors the real wire:
     // a function opts.text wins, then opts.text, then btn[data-copy]; a click
@@ -308,7 +308,7 @@ function harness(mode) {
   vm.runInNewContext(source.slice(start, end), sandbox);
 
   const wizard = group.children.at(-1);
-  const back = footer.children.find(child => child.className.includes('antler-back'));
+  const back = footer.children.find(child => child.className.includes('tusk-back'));
   const flush = () => new Promise(resolve => setImmediate(resolve));
   const settle = async () => { for (let i = 0; i < 6; i++) { await flush(); } };
   const submit = async () => { form.emit('submit', { preventDefault() {} }); await settle(); };
@@ -343,12 +343,12 @@ async function statusView() {
   await h.settle();
 
   // It opens complete from the embedded seed, not a blank table that fills later.
-  assert.match(h.collect(h.wizard.nodes['.antler-records']), /Connector Status/, 'status table is laid out on open');
-  assert.match(h.collect(h.wizard.nodes['.antler-records']), /mx\.example\.com/, 'connector names come from the form seed');
+  assert.match(h.collect(h.wizard.nodes['.tusk-records']), /Connector Status/, 'status table is laid out on open');
+  assert.match(h.collect(h.wizard.nodes['.tusk-records']), /mx\.example\.com/, 'connector names come from the form seed');
 
   // The footer keeps key rotation and Remove receiving and drops the unrelated
   // provider Worker-secret regenerate.
-  assert.equal(h.workerRegenerate.hidden, true, 'Worker-secret regenerate is hidden on Antler status');
+  assert.equal(h.workerRegenerate.hidden, true, 'Worker-secret regenerate is hidden on Tusk status');
   assert.equal(h.rotate.hidden, false, 'Regenerate key stays available');
   assert.equal(h.removeReceiving.hidden, false, 'Remove receiving stays available');
   assert.equal(h.back.hidden, true, 'the saved status view has no Back');
@@ -356,15 +356,15 @@ async function statusView() {
 
   // D107: the saved status view is buttonless and counter-free. There is no
   // "Check now", no countdown: it reconciles on SSE and a slow fallback poll.
-  assert.doesNotMatch(h.collect(h.wizard.nodes['.antler-checks']), /Check now/, 'no Check now button');
-  assert.doesNotMatch(h.collect(h.wizard.nodes['.antler-checks']), /Checking again in/, 'no countdown on the status view');
+  assert.doesNotMatch(h.collect(h.wizard.nodes['.tusk-checks']), /Check now/, 'no Check now button');
+  assert.doesNotMatch(h.collect(h.wizard.nodes['.tusk-checks']), /Checking again in/, 'no countdown on the status view');
 
   // A receiver the core cannot reach is a fact, not "in progress": the row must
   // read red and name the failure.
   h.world.statuses = [{ state: 'unreachable', smtp_hostname: 'mx.example.com', reason: 'unreachable' }];
   h.world.dns = [];
   await h.fireTimer(t => t.delay === 60000);
-  const table = () => h.wizard.nodes['.antler-records'].children.find(el => el.tagName === 'TABLE');
+  const table = () => h.wizard.nodes['.tusk-records'].children.find(el => el.tagName === 'TABLE');
   const cellOf = i => table().children[1].children[i].children[1];
   assert.match(cellOf(0).children[0].className, /red/, 'an unreachable connector is red, not amber');
   assert.equal(cellOf(0).children[1].textContent, 'Receiver unreachable');
@@ -388,7 +388,7 @@ async function statusView() {
   ];
   h.world.statuses = [{ state: 'rejected', reason: 'key_unavailable', smtp_hostname: 'mx.example.com' }];
   await h.fireTimer(t => t.delay === 60000);
-  const remediation = () => h.wizard.nodes['.antler-records'].children.find(el => el.className === 'antler-dns-remediation') || new Element('DIV');
+  const remediation = () => h.wizard.nodes['.tusk-records'].children.find(el => el.className === 'tusk-dns-remediation') || new Element('DIV');
   assert.match(h.collect(remediation()), /Domain not authorized/, 'the TXT fix is shown');
    assert.doesNotMatch(h.collect(remediation()), /MX records/, 'a local DNS failure does not invent a receiver routing refusal');
 
@@ -413,10 +413,10 @@ async function statusSettings() {
   await h.settle();
 
   // Settings live below the records: the status picture reads first.
-  const settings = h.wizard.querySelector('[data-antler-settings]');
+  const settings = h.wizard.querySelector('[data-tusk-settings]');
   assert.ok(settings, 'the status view carries a settings section');
   assert.ok(
-    h.wizard.children.indexOf(h.wizard.querySelector('.antler-records')) < h.wizard.children.indexOf(settings),
+    h.wizard.children.indexOf(h.wizard.querySelector('.tusk-records')) < h.wizard.children.indexOf(settings),
     'settings sit below the status records'
   );
   assert.equal(settings.children.includes(h.email.previousElementSibling), true, 'the contact email label is in settings');
@@ -448,7 +448,7 @@ async function statusSettings() {
   h.enforcement.value = 'moderate';
   h.enforcement.emit('input');
   await h.submit();
-  assert.match(h.wizard.nodes['.antler-error'].textContent, /Unable to save/, 'a failed settings save reports the error');
+  assert.match(h.wizard.nodes['.tusk-error'].textContent, /Unable to save/, 'a failed settings save reports the error');
 }
 
 // --- wizard ---------------------------------------------------------------
@@ -473,7 +473,7 @@ async function wizard(mode) {
     advanced.emit('change');
     await h.submit();
     assert.equal(h.wizard.panels[4].hidden, false, 'the advanced path reaches the URL step');
-    h.wizard.querySelector('.antler-custom-urls').value = 'https://custom.example.com';
+    h.wizard.querySelector('.tusk-custom-urls').value = 'https://custom.example.com';
     await h.submit();
   } else {
     await h.submit(); // contact email -> DNS records
@@ -487,7 +487,7 @@ async function wizard(mode) {
 
   // Step 1 is the DNS record table with its own copy buttons.
   assert.equal(h.wizard.panels[1].hidden, false, 'the DNS step is shown');
-  const table = h.collect(h.wizard.nodes['.antler-records']);
+  const table = h.collect(h.wizard.nodes['.tusk-records']);
   assert.match(table, /Name Type Priority Value Status/, 'the wizard uses the DNS record layout');
   assert.match(table, /mx\.example\.com/, 'the suggested MX record is listed');
 
@@ -505,9 +505,9 @@ async function wizard(mode) {
   // The wizard, unlike the status view, shows a live countdown while a data step
   // is open, so the operator can see the check is still running.
   if (HAVE.wizardCountdown) {
-    assert.equal(h.wizard.nodes['.antler-checks'].hidden, false, 'the check row is visible on the DNS step');
-    assert.match(h.collect(h.wizard.nodes['.antler-checks']), /checking again in \d+s/, 'the DNS step shows a live countdown');
-    assert.match(h.collect(h.wizard.nodes['.antler-checks']), /Checked /, 'the countdown names when the last check ran');
+    assert.equal(h.wizard.nodes['.tusk-checks'].hidden, false, 'the check row is visible on the DNS step');
+    assert.match(h.collect(h.wizard.nodes['.tusk-checks']), /checking again in \d+s/, 'the DNS step shows a live countdown');
+    assert.match(h.collect(h.wizard.nodes['.tusk-checks']), /Checked /, 'the countdown names when the last check ran');
     assert.ok(h.pends(1000), 'the countdown ticks once a second');
 
     // A timer-driven refresh advances the check without any user action: the
@@ -528,10 +528,10 @@ async function wizard(mode) {
   await h.submit();
   assert.equal(h.wizard.panels[2].hidden, false, 'the receivers step is shown');
   assert.equal(h.save.disabled, false, 'one ready receiver unlocks Next');
-  assert.doesNotMatch(h.collect(h.wizard.nodes['.antler-receivers']), /No MX records|Domain not authorized/, 'wizard receivers do not contradict readiness');
-  assert.match(h.collect(h.wizard.nodes['.antler-records']), /Matching/, 'DNS instructions reflect the receiver proof');
+  assert.doesNotMatch(h.collect(h.wizard.nodes['.tusk-receivers']), /No MX records|Domain not authorized/, 'wizard receivers do not contradict readiness');
+  assert.match(h.collect(h.wizard.nodes['.tusk-records']), /Matching/, 'DNS instructions reflect the receiver proof');
   if (HAVE.wizardCountdown) {
-    assert.match(h.collect(h.wizard.nodes['.antler-checks']), /checking again in \d+s/, 'the receivers step also counts down');
+    assert.match(h.collect(h.wizard.nodes['.tusk-checks']), /checking again in \d+s/, 'the receivers step also counts down');
   }
 
   // Finish is never gated on readiness.
@@ -551,20 +551,20 @@ async function wizard(mode) {
 
   // Finishing saves and closes; reopening presents the saved status view.
    assert.equal(h.dlg.open, false, 'Finish closes the dialog after saving');
-  assert.match(h.collect(h.wizard.nodes['.antler-records']), /Connector Status/, 'the status table is shown after Finish');
+  assert.match(h.collect(h.wizard.nodes['.tusk-records']), /Connector Status/, 'the status table is shown after Finish');
   // The footer's close control is relabelled as the wizard becomes the saved
   // status view. It was only set once at init, so a freshly-finished setup left
   // a stray "Cancel" beside an otherwise actionless status panel.
   assert.equal(h.close.textContent, 'Close', 'Finish relabels the footer control from Cancel to Close');
   const expectConfig = mode === 'custom'
     ? { service: 'custom', enforcement: 'hard', receiver_urls: 'https://custom.example.com' }
-    : { service: 'antler', enforcement: 'hard', contact_email: 'ops@example.com' };
+    : { service: 'tusk', enforcement: 'hard', contact_email: 'ops@example.com' };
   assert.deepEqual(h.world.saved, { provider: 'dialmx', config: expectConfig },
     'Finish writes the config with the chosen enforcement and never rotates');
   h.dlg.open = true;
   h.dlg.emit('open');
   await h.settle();
-  assert.match(h.collect(h.wizard.nodes['.antler-records']), /Connector Status/, 'reopening shows status rather than restarting setup');
+  assert.match(h.collect(h.wizard.nodes['.tusk-records']), /Connector Status/, 'reopening shows status rather than restarting setup');
 
   // Nothing polls once the dialog is closed.
   h.dlg.open = false;
@@ -577,22 +577,22 @@ async function wizard(mode) {
 
 // --- intro copy -----------------------------------------------------------
 
-// A fresh setup opens on step 0 with a short Antler MX service intro and the
+// A fresh setup opens on step 0 with a short Tusk MX service intro and the
 // mail-flow diagram. It is about the hosted service, so it reads once: moving on
 // hides it, and neither custom-receiver mode nor the saved status view shows it.
 async function introCopy() {
-  const find = h => h.wizard.children.find(child => child.className === 'antler-intro');
+  const find = h => h.wizard.children.find(child => child.className === 'tusk-intro');
   const hosted = harness('hosted');
   await hosted.settle();
   const intro = find(hosted);
-  assert.ok(intro, 'the wizard builds the Antler MX intro');
+  assert.ok(intro, 'the wizard builds the Tusk MX intro');
   assert.equal(intro.hidden, false, 'the intro shows on the first step');
   await hosted.submit();
   assert.equal(intro.hidden, true, 'advancing past the first step hides the intro');
 
   const custom = harness('custom');
   await custom.settle();
-  assert.equal(find(custom).hidden, true, 'custom receivers do not show the Antler MX intro');
+  assert.equal(find(custom).hidden, true, 'custom receivers do not show the Tusk MX intro');
 
   const status = harness('status');
   await status.settle();
@@ -619,7 +619,7 @@ async function rotation() {
 
   // Rotation opens the replace-the-TXT step and cannot go back to contact/setup.
   assert.equal(h.wizard.panels[1].hidden, false, 'rotation opens the DNS step');
-  assert.match(h.collect(h.wizard.nodes['.antler-records']), /public-key/, 'the new TXT value is shown');
+  assert.match(h.collect(h.wizard.nodes['.tusk-records']), /public-key/, 'the new TXT value is shown');
   assert.equal(h.back.hidden, true, 'rotation cannot return to the pre-rotation steps');
 
   // A receiver that has not reconnected must not trap the operator.
@@ -633,7 +633,7 @@ async function rotation() {
   h.world.rejectSave = true;
   h.rotate.emit('submit', { defaultPrevented: false, preventDefault() {} });
   await h.settle();
-  assert.match(h.wizard.nodes['.antler-error'].textContent, /key may already have changed/);
+  assert.match(h.wizard.nodes['.tusk-error'].textContent, /key may already have changed/);
   const failed = h.world.requests.filter(r => r.options.method === 'PUT').length;
   await h.fireTimer(t => t.delay === 10000 || t.delay === 60000);
   assert.equal(h.world.requests.filter(r => r.options.method === 'PUT').length, failed, 'a failed rotation is not retried');
@@ -662,7 +662,7 @@ async function liveUpdates() {
   h.world.dns = [{ kind: 'mx', state: 'ok', matched: ['mx.example.com'], unexpected: ['rogue.example.com'] }];
   h.world.unexpected = ['rogue.example.com'];
   await h.fireTimer(t => t.delay === 60000);
-  assert.match(h.collect(h.wizard.nodes['.antler-records']), /rogue\.example\.com/, 'the extra-MX warning names the rogue host');
+  assert.match(h.collect(h.wizard.nodes['.tusk-records']), /rogue\.example\.com/, 'the extra-MX warning names the rogue host');
 
   // The contact email only offers Save once it actually differs from the saved
   // value, so a stray keystroke cannot rewrite settings.
@@ -674,7 +674,7 @@ async function liveUpdates() {
 async function receiverTruth() {
   const h = harness('status');
   await h.settle();
-  const records = () => h.collect(h.wizard.nodes['.antler-records']);
+  const records = () => h.collect(h.wizard.nodes['.tusk-records']);
   h.world.dns = [{ kind: 'mx', state: 'not_found' }, { kind: 'txt', state: 'not_found' }];
   h.world.statuses = h.seedStatus;
   await h.fireTimer(t => t.delay === 60000);
@@ -745,5 +745,5 @@ const SUITES = {
     if (!fn) { throw new Error('unknown suite ' + name); }
     await fn();
   }
-  console.log('antler wizard interaction checks passed: ' + names.join(', '));
+  console.log('tusk wizard interaction checks passed: ' + names.join(', '));
 })().catch(error => { console.error(error); process.exitCode = 1; });

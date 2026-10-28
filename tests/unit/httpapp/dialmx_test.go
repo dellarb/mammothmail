@@ -282,7 +282,7 @@ func TestDialMXWizardRotationReturnsCurrentDNS(t *testing.T) {
 		t.Fatalf("rotation rewrote connector settings: before=%+v after=%+v err=%v", beforeConfig, afterConfig, err)
 	}
 	body := dialogHTML(t, domainGet(t, h, cookie, "/?domain="+domain.ID+"&kind=receiving").Body.String(), "domain-receiving-dialog-"+domain.ID)
-	for _, want := range []string{"data-antler-regenerate", "This invalidates the current key", "replace the authorization TXT record", "Your MX records stay the same."} {
+	for _, want := range []string{"data-tusk-regenerate", "This invalidates the current key", "replace the authorization TXT record", "Your MX records stay the same."} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("rotation confirmation missing %q", want)
 		}

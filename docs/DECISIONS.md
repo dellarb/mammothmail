@@ -85,7 +85,7 @@ Earlier decisions are left in place for context. Where a decision has been super
 - [D079: Per-inbox storage quotas](#d079-per-inbox-storage-quotas)
 - [D080: Configurable HTTP receiver listener and public origin](#d080-configurable-http-receiver-listener-and-public-origin)
 - [D081: Delivery auto-actions default to the `all` trigger](#d081-delivery-auto-actions-default-to-the-all-trigger)
-- [D082: Antler MX: a named shared receiver service with live endpoint discovery](#d082-antler-mx-a-named-shared-receiver-service-with-live-endpoint-discovery)
+- [D082: Tusk MX: a named shared receiver service with live endpoint discovery](#d082-tusk-mx-a-named-shared-receiver-service-with-live-endpoint-discovery)
 - [D083: Cleartext shared-mode sessions from a trusted TLS-terminating proxy](#d083-cleartext-shared-mode-sessions-from-a-trusted-tls-terminating-proxy)
 - [D084: Remote MX: an account-owned single-mode receiver](#d084-remote-mx-an-account-owned-single-mode-receiver)
 - [D085: First-run HTTP setup wizard (supersedes D055 in part)](#d085-first-run-http-setup-wizard-supersedes-d055-in-part)
@@ -116,7 +116,7 @@ Earlier decisions are left in place for context. Where a decision has been super
 - [D110: Useful common message metadata, internal-only IMAP locators, and safe direction inference](#d110-useful-common-message-metadata-internal-only-imap-locators-and-safe-direction-inference)
 - [D130: Microsoft push callbacks are silent fetch hints](#d130-microsoft-push-callbacks-are-silent-fetch-hints)
 - [D111: Local DNS checks distinguish "absent" from "unknown", and share the receiver's MM1 rule](#d111-local-dns-checks-distinguish-absent-from-unknown-and-share-the-receivers-mm1-rule)
-- [D112: Antler setup keeps its receiver snapshot, and its settings are editable in place](#d112-antler-setup-keeps-its-receiver-snapshot-and-its-settings-are-editable-in-place)
+- [D112: Tusk setup keeps its receiver snapshot, and its settings are editable in place](#d112-tusk-setup-keeps-its-receiver-snapshot-and-its-settings-are-editable-in-place)
 - [D069: DKIM signing on the Direct MX outbound path](#d069-dkim-signing-on-the-direct-mx-outbound-path)
 - [D113: DKIM published-record indicator on the Direct MX sending side](#d113-dkim-published-record-indicator-on-the-direct-mx-sending-side)
 - [D114: Review remediation: partial fan-out acknowledgement, account-settings scope, and config honesty](#d114-review-remediation-partial-fan-out-acknowledgement-account-settings-scope-and-config-honesty)
@@ -155,6 +155,7 @@ Earlier decisions are left in place for context. Where a decision has been super
 - [D149: Direct MX stays in Receiving; Remote MX is a separate provider](#d149--direct-mx-stays-in-receiving-remote-mx-is-a-separate-provider)
 - [D150: One native mailbox pagination and discovery contract](#d150--one-native-mailbox-pagination-and-discovery-contract)
 - [D153: Forwarding and a common outbound API response](#d153--forwarding-and-a-common-outbound-api-response)
+- [D157: Complete the Antler-to-Tusk MX migration](#d157--complete-the-antler-to-tusk-mx-migration)
 
 ---
 
@@ -2628,7 +2629,7 @@ no new migration.
 also fixes its returned `model.Inbox` reporting no trigger at all), two blank-form
 defaults, four preselected options, one JavaScript fallback, and doc/spec text.
 
-## D082 — Antler MX: a named shared receiver service with live endpoint discovery
+## D082 — Tusk MX: a named shared receiver service with live endpoint discovery
 
 **Requirement:** Give a self-hoster a zero-config direct-SMTP option that needs no
 public inbound port on the core and no receiver of their own: select a named
@@ -2639,14 +2640,14 @@ messages) to account for usage.
 **Decision:** Extend the per-domain Dial MX receiving provider (`dialmx`) with a
 `service` choice:
 
-- `antler` (default) — Antler MX, the hosted shared relay. The core resolves the
+- `tusk` (default) — Tusk MX, the hosted shared relay. The core resolves the
   receiver set from a versioned JSON manifest, snapshots it into the domain's
   encrypted receiving configuration, generates the domain's exact Ed25519 key,
   and shows the MX and `_mailmoose-mx.<domain>` TXT records to publish.
 - `custom` — the pre-existing manual `receiver_urls` behaviour, unchanged. A
-  legacy save with only `receiver_urls` is never silently treated as Antler.
+  legacy save with only `receiver_urls` is never silently treated as Tusk.
 
-The manifest is compiled in (`internal/transport/mxdial/antler-endpoints.json`)
+The manifest is compiled in (`internal/transport/mxdial/endpoints.json`)
 and fetched live from the project repository at setup-save time, with a
 ten-minute cache, a last-known-good fallback and the embedded copy as the final
 fallback, so a hosting outage never blocks setup. It carries both the HTTPS
@@ -2663,7 +2664,7 @@ Registration metadata travels per domain: `DomainAuth` gains optional
 malformed value is dropped rather than failing the proof. The receiver logs both
 on the `dialmx domain auth` registration/renewal summary and on the per-recipient
 resolve and handoff records, so usage (contact, setup, domains, messages) can be
-read or exported from the receiver's structured logs. Antler MX does not
+read or exported from the receiver's structured logs. Tusk MX does not
 introduce an account tie-in, an operator dashboard, a receiver database or a
 durable queue.
 
@@ -2697,14 +2698,14 @@ later addition requiring no rework.
 
 **Consequences:**
 
-- The Dial MX provider selector reads **Antler MX (Free SMTP Relay - no port
-  forwards required)**; the short label stays **Antler MX**.
+- The Dial MX provider selector reads **Tusk MX (Free SMTP Relay - no port
+  forwards required)**; the short label stays **Tusk MX**.
 - `DomainAuth` metadata is an optional field on the strict mx-v2 contract:
   a receiver or core built before it rejects the frame as malformed when it
   receives the fields, so **upgrade the shared receiver first, then cores** —
   the same coordinated-release pattern as D072. Custom cores send no metadata
   and are unaffected.
-- Antler MX endpoints are public-only regardless of a self-hosted operator's
+- Tusk MX endpoints are public-only regardless of a self-hosted operator's
   outbound opt-out: the hosted service must never resolve to a private
   destination.
 - No new dependency, service or runtime component is added to the core; the
@@ -2779,8 +2780,8 @@ own standalone Dial MX receiver and point their domains at it without a system
 administrator and without exposing a public inbound port on the core.
 
 **Decision:** Add **Remote MX** (`remotemx`), a third direct-SMTP receiving
-provider alongside Direct MX (`mx`, installation) and Antler MX (`dialmx`
-service `antler`, shared DNS relay). It is Dial MX in **single mode only**: the
+provider alongside Direct MX (`mx`, installation) and Tusk MX (`dialmx`
+service `tusk`, shared DNS relay). It is Dial MX in **single mode only**: the
 core dials the account's receiver outbound over HTTPS/2 (or cleartext h2c for an
 explicitly-private receiver) and authenticates with a shared bearer key. There
 is no DNS proof and no per-domain key.
@@ -2824,9 +2825,9 @@ database engine.
 **Consequences:**
 
 - The domain Receiving provider menu now offers three direct-SMTP paths:
-  **Direct MX** (installation, system administrator), **Antler MX** (shared,
+  **Direct MX** (installation, system administrator), **Tusk MX** (shared,
   DNS-authenticated, zero-config) and **Remote MX** (account, single-mode
-  bearer). DNS-authenticated shared receivers remain Antler MX / per-domain Dial
+  bearer). DNS-authenticated shared receivers remain Tusk MX / per-domain Dial
   MX custom; Remote MX does not do DNS auth.
 - The receiver and the `mxdial` wire/dialer code are unchanged; the provider
   slug `remotemx` carries no `ConfigField`s (the receiver is account-scoped) and
@@ -3034,7 +3035,7 @@ management and API-key endpoints are unchanged.
 "Recent messages" table) label every row's origin in a single **Source** column,
 renamed from **Client**. For outbound mail the source is unchanged — the API
 key / Hermes credential that sent it. For inbound mail it now names the
-concrete receiver: `Antler: <smtp_hostname>` for a hosted Antler MX shared
+concrete receiver: `Tusk: <smtp_hostname>` for a hosted Tusk MX shared
 receiver (resolved from the domain's saved receiver snapshot by matching the
 session URL, never hard-coded), `Dial MX: <host>` for a custom Dial MX receiver,
 `Direct MX` for the installation receiver, `Remote MX` for an account receiver,
@@ -3055,7 +3056,7 @@ composes the label. No `mxwire` protocol change and no receiver rollout is
 required.
 
 **Reason:** an operator could previously see only "mx" for all three MX families
-and had no way to tell which Antler receiver delivered a message. The receiver
+and had no way to tell which Tusk receiver delivered a message. The receiver
 is known at receive time, so labelling it there is both cheaper and more
 accurate than reconstructing it later.
 
@@ -3300,7 +3301,7 @@ could be shown "ready" while the core's MX check said it was not routed, and the
 operator had two sources of truth to reconcile. The receiver is the only party
 that can authoritatively say "I am a delivery target for this domain".
 
-**Decision (2026-10-10):** A shared-mode Dial MX receiver (Antler MX and custom
+**Decision (2026-10-10):** A shared-mode Dial MX receiver (Tusk MX and custom
 Dial MX) verifies routing itself and reports it on its own status light, so each
 receiver is one traffic light and the core no longer independently decides
 routing. The authorization proof becomes two ordered gates:
@@ -3336,7 +3337,7 @@ Consequences on the core side:
 - The receiving dialog's per-receiver table collapses from
   `Connector | Connection status | MX status` to `Connector | Status` (one light).
 - No protocol version bump and no capability negotiation: `AuthResult.Reason` is
-  already a free string, and the Antler fleet is upgraded in place, so an old
+  already a free string, and the Tusk fleet is upgraded in place, so an old
   receiver's `ready` cannot be mistaken for a routed one by a new core only if the
   fleet is not mixed — the fleet is upgraded together.
 
@@ -3884,14 +3885,14 @@ change is needed. No new dependency or service. See `docs/EMAIL_PROVIDERS.md#one
 
 **Date:** 2026-10-12. **Approved by:** Ben.
 
-**Requirement:** The saved Antler MX status dialog polled its setup GET every
+**Requirement:** The saved Tusk MX status dialog polled its setup GET every
 10 seconds with a **Check now** button and a countdown, and every poll ran the
 bounded published-record (`checkMX`/`checkTXT`) resolver lookups — even though
 the status page rendered only the receivers' self-reported `status[]`. Separately,
-a domain with a ready Antler receiver could still publish MX records pointing
+a domain with a ready Tusk receiver could still publish MX records pointing
 elsewhere (a leftover Google Workspace record, an auto-added backup MX, a `*`
 wildcard inherited by a subdomain) with nothing surfacing that mail might not route
-via Antler; and a domain whose TXT *and* MX were both wrong showed only the TXT
+via Tusk; and a domain whose TXT *and* MX were both wrong showed only the TXT
 prompt, because the receiver stops at its first failing gate and reports a single
 reason.
 
@@ -3910,10 +3911,10 @@ top-level `unexpected_mx[]` from the watcher's cache for every read; nothing
 resolves DNS on a render. (4) The aggregate dashboard light keeps green/amber/red:
 green when at least one receiver is ready and no rogue MX records are published;
 amber when at least one receiver is ready but the domain publishes MX hostnames that
-are not Antler receivers; red otherwise. (5) The status view's fix prompts are
+are not Tusk receivers; red otherwise. (5) The status view's fix prompts are
 driven by the **per-check DNS verdict**, not the receiver's single reason, so a
 domain with both TXT and MX wrong shows **both** prompts; each receiver row shows
-its specific Antler reason (`not in MX`, `key unavailable`, `authentication
+its specific Tusk reason (`not in MX`, `key unavailable`, `authentication
 failed`, `receiver unreachable`, …) inline next to its light. The form embeds the
 DNS verdict, the copy-ready records and the extra-MX list so the dialog opens
 complete and updates live.
@@ -3932,7 +3933,7 @@ reason cannot.
 **Complexity:** No new dependency, service, table or migration. The check logic
 moves to `internal/app` (one resolver-bounded implementation); a new
 `internal/app` watcher (`ExtraMXWatcher`, reusing the store, the Dial MX manager
-status and the Antler receiver snapshot) owns the verdict and publishes
+status and the Tusk receiver snapshot) owns the verdict and publishes
 `mx.dns_changed`; `dialMXHealth` takes the verdict; `domainInboundLight` and the
 dashboard render read it via `Service.DNSState`/`ExtraMXState` (no DNS); the
 receiving response exposes `dns[]` and `unexpected_mx`; the dialog's JS renders the
@@ -4146,11 +4147,11 @@ existing last-verdict map; and a net deletion of `txtMatches`/`parseMM1`. One
 imported helper (`mxwire.ParseDomainTXT`) already used by the receiver. No new
 dependency, service, table or migration. See `docs/REMOTE_MX.md`, `docs/API.md`.
 
-## D112 — Antler setup keeps its receiver snapshot, and its settings are editable in place
+## D112 — Tusk setup keeps its receiver snapshot, and its settings are editable in place
 
 **Date:** 2026-10-12. **Approved by:** Ben.
 
-**Requirement:** Two problems with editing a saved Antler MX setup. (1) Every save
+**Requirement:** Two problems with editing a saved Tusk MX setup. (1) Every save
 re-resolved the live receiver manifest, so the wizard — which saves the
 configuration more than once while an operator works through its steps — could
 select a different receiver set at Finish from the one whose DNS records the
@@ -4160,11 +4161,11 @@ saved status view could edit the contact email but not the authentication
 enforcement policy, and offered no non-destructive route to either once the setup
 wizard had been left.
 
-**Decision:** (1) `fillAntlerReceivingConfig` reuses a valid stored receiver
+**Decision:** (1) `fillTuskReceivingConfig` reuses a valid stored receiver
 snapshot and only resolves the live manifest when there is none (a new setup, a
 legacy config, or a corrupt snapshot). A re-save therefore keeps the domain's
 receiver set; changing it is an explicit new setup, not a side effect of saving.
-(2) `UpdateAntlerSettings` (replacing the contact-email-only update) applies the
+(2) `UpdateTuskSettings` (replacing the contact-email-only update) applies the
 contact email and the enforcement policy together, preserving the receiver
 snapshot, setup identity and domain credential; enforcement values come from
 `mxdial.ValidEnforcement`, so the settings path and the config schema share one
@@ -4218,7 +4219,7 @@ never appears in a config response. A key posted to the hidden field is discarde
 rather than used: the only trusted source is the stored key.
 
 The record to publish is shown **inline in the sending editor**, in the same
-record-table style as the Antler MX setup screen, and appears as soon as signing
+record-table style as the Tusk MX setup screen, and appears as soon as signing
 is switched on. The private key is available on demand behind a "Show private
 key" disclosure whose reveal is a CSRF-protected POST carrying a one-time,
 single-use flash; it is never rendered on the page.
@@ -4321,7 +4322,7 @@ the sending side is the obvious and symmetric gap to close.
   is already grey, so `grey` is an explicit alias for a state that is neither a
   settled pass nor a settled failure.
 - The sending dialog polls the record light while open
-  (`GET /ui/domains/{id}/sending/dkim/status`), mirroring the Antler status poll,
+  (`GET /ui/domains/{id}/sending/dkim/status`), mirroring the Tusk status poll,
   so an operator watching DNS propagate sees the dot turn green without
   reopening. The endpoint reads the watcher's cached verdict and asks for a
   stale-triggered re-check, so a poll never blocks on a lookup.
@@ -5200,8 +5201,8 @@ the two shells).
 
 **Date:** 2026-10-15. **Approved by:** Ben.
 
-**Antler UI update (2026-10-21, approved by Ben):** The local-DNS hard-gate
-presentation below is superseded for Antler setup and status. A current receiver
+**Tusk UI update (2026-10-21, approved by Ben):** The local-DNS hard-gate
+presentation below is superseded for Tusk setup and status. A current receiver
 grant proves TXT authority and that receiver's MX routing; an independently cached
 negative DNS result must not contradict it. DNS-step record lights follow receiver
 proofs, and repair prompts follow explicit receiver refusals (`not_mx` or
@@ -5212,7 +5213,7 @@ gates are unchanged. Busy refresh requests are coalesced, stale snapshots get a
 bounded retry, and successful setup Finish saves and closes the dialog; reopening
 shows status. Rotation retains its separate completion flow.
 
-**Requirement:** On a brand-new domain in Antler MX mode the MX check read
+**Requirement:** On a brand-new domain in Tusk MX mode the MX check read
 `mismatch` while the TXT check reported `pending`, which the operator read as
 "the work is underway" — but nothing was pending. Two problems sat behind that.
 (1) The state vocabulary lied: `pending` is a temporally-loaded word that implies
@@ -5458,7 +5459,7 @@ version names; this decision supersedes those names for the current protocol.
 **Consequences:** Core and receiver must be rebuilt and updated together.
 Pre-release v2 peers are incompatible; there is no alias, negotiation or fallback.
 Message storage, encrypted domain keys, DNS `MM1` proofs, `mxfp-v1` retry receipts,
-the Antler manifest schema and the separate `/v1` agent API do not change. No data
+the Tusk manifest schema and the separate `/v1` agent API do not change. No data
 migration is required, and existing domain keys need not be rotated.
 
 **Complexity:** Rename protocol identifiers, session types and source/test files;
@@ -5531,7 +5532,7 @@ service, destination-binding schema, token format or approval protocol.
 **Requirement:** A receiver the core can reach but that will not take the session
 must read as a settled failure. An incompatible receiver build answers `404` for
 the session path this core posts (`D132` renumbered it to `/mx/v1/session`), and
-`failureState` collapsed every such answer into `disconnected`, which the Antler
+`failureState` collapsed every such answer into `disconnected`, which the Tusk
 status dialog and the account Remote MX panel render as "Reconnecting" — forever,
 because the condition never clears on its own and the retry loop keeps running.
 The operator saw a session still in progress where the receiver had in fact
@@ -5552,7 +5553,7 @@ answered and declined.
 - Unchanged: a receiver that has never answered is `unreachable` (DNS, TLS, a
   refused connection, and every timeout), and one that was reached and dropped is
   `disconnected`.
-- All four status surfaces follow the state so they cannot disagree: the Antler
+- All four status surfaces follow the state so they cannot disagree: the Tusk
   status dialog rows, the server-rendered setup panel, the account Remote MX pill
   (previously "connecting" for every non-ready state), and the installation
   Direct MX panel. Each refusal reason gets its own operator-facing phrase, and a
@@ -6480,3 +6481,38 @@ carrying it in that inbox. No opaque tag-ID migration is introduced.
 capabilities, routes and event types. Clients ignore unknown response fields/events
 and preserve opaque references. Breaking contract changes require a new API
 version. No new service, dependency or database migration is needed here.
+
+## D157 — Complete the Antler-to-Tusk MX migration
+
+**Requirement:** Replace the hosted relay's old name throughout the codebase,
+including its API and persisted configuration, rather than retaining an internal
+Antler service underneath Tusk branding.
+
+**Decision (2026-10-28, explicitly approved by Ben):** Rename the hosted service
+value from `"antler"` to `"tusk"` in receiving API requests, `config.service` and
+`instructions.service`. Rename the top-level response field `antler_manifest`
+to `tusk_manifest`. This also applies to the browser's session-scoped receiving
+setup responses. The `dialmx` provider and existing routes remain unchanged.
+Reject the former service value on new API writes. This is an explicitly
+approved breaking naming change; clients must update their service values and
+manifest-field reads.
+
+Rename Go symbols, source/test filenames, JavaScript selectors, assets, test
+environment variables, CI references and documentation to Tusk. Use the existing
+`internal/transport/mxdial/endpoints.json` as both the live and embedded Tusk
+manifest; remove the old `antler-endpoints.json` file.
+
+**Existing installations:** Translate the saved `"antler"` service and
+`antler_receivers`, `antler_manifest_source`, `antler_manifest_at` keys at the
+shared receiving-config read boundary. All consumers see Tusk names immediately;
+the next configuration/settings save writes only the new names. Preserve the
+receiver snapshot verbatim, including old receiver hostnames and IDs, along with
+the setup identity and domain key. Renaming is not permission to silently
+repoint DNS or mail delivery. Existing message source history is not rewritten;
+new deliveries use Tusk source labels. Existing clients fetching the removed
+manifest must upgrade or rely on their own cached/embedded fallback.
+
+**Complexity:** One small translation at the existing encrypted-config boundary;
+no database schema change, dependency, new service, credential rotation or DNS
+deployment. Only legacy-data handling, regression fixtures and this migration
+record retain the old name.

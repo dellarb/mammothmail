@@ -14,7 +14,7 @@ import (
 // TestDashboardConnectorLightRendersForDialMXOnly proves the dashboard's
 // Domains table draws the aggregate red/green connector light for a Dial MX
 // domain and leaves a non-Dial MX domain's Receiving cell untouched. With no
-// live manager the configured Antler receiver is only "connecting", and the
+// live manager the configured Tusk receiver is only "connecting", and the
 // light is red — the honest state when no receiver can be confirmed ready and
 // routed. (The red/green MX-gating logic itself is pinned by
 // TestDialMXHealthAggregatesReceiverStatus.)
@@ -22,17 +22,17 @@ func TestDashboardConnectorLightRendersForDialMXOnly(t *testing.T) {
 	t.Parallel()
 	svc, h, u, mailgunDomain, _ := httpFixture(t)
 	ctx := context.Background()
-	svc.AntlerEndpoints = fixedAntler{receivers: []mxdial.AntlerReceiver{
-		{ID: "antler-1", SessionURL: "https://antler1.example.test", SMTPHostname: "antler1.example.test", MXPriority: 10},
+	svc.TuskEndpoints = fixedTusk{receivers: []mxdial.TuskReceiver{
+		{ID: "tusk-1", SessionURL: "https://tusk1.example.test", SMTPHostname: "tusk1.example.test", MXPriority: 10},
 	}}
 	dialDomain, err := svc.Store.CreateDomain(ctx, u.AccountID, "dial.example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := svc.SaveDomainReceivingConfig(ctx, u.AccountID, dialDomain.ID, "dialmx", map[string]any{
-		"service": mxdial.ServiceAntler, "contact_email": "ops@example.test",
+		"service": mxdial.ServiceTusk, "contact_email": "ops@example.test",
 	}, false); err != nil {
-		t.Fatalf("antler save: %v", err)
+		t.Fatalf("tusk save: %v", err)
 	}
 
 	cookie, _ := uiSession(t, svc, u.ID)
@@ -66,7 +66,7 @@ func TestDashboardConnectorLightRendersForDialMXOnly(t *testing.T) {
 }
 
 // TestDashboardConnectorLightAbsentWithoutReceivers proves the aggregate light is
-// gated on the domain actually naming a receiver target. An Antler MX setup whose
+// gated on the domain actually naming a receiver target. A Tusk MX setup whose
 // receiver set is empty — the manifest advertised none, or the operator started
 // setup and abandoned it after the config was saved — must render no dot at all,
 // rather than a red "no inbound connector is ready / mail delivery is blocked"
@@ -80,15 +80,15 @@ func TestDashboardConnectorLightAbsentWithoutReceivers(t *testing.T) {
 	// A manifest that advertises no receivers is a real (if useless) state: the
 	// save path stores the empty snapshot, so the domain has a Dial MX receiving
 	// configuration that names nothing.
-	svc.AntlerEndpoints = fixedAntler{receivers: nil}
+	svc.TuskEndpoints = fixedTusk{receivers: nil}
 	emptyDomain, err := svc.Store.CreateDomain(ctx, u.AccountID, "empty.example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := svc.SaveDomainReceivingConfig(ctx, u.AccountID, emptyDomain.ID, "dialmx", map[string]any{
-		"service": mxdial.ServiceAntler, "contact_email": "ops@example.test",
+		"service": mxdial.ServiceTusk, "contact_email": "ops@example.test",
 	}, false); err != nil {
-		t.Fatalf("antler save with no receivers: %v", err)
+		t.Fatalf("tusk save with no receivers: %v", err)
 	}
 	// The provider is recorded, so the dialmx credential exists; the point is
 	// that no receiver target does.
@@ -140,7 +140,7 @@ func TestDashboardConnectorLightAbsentWithoutReceivers(t *testing.T) {
 
 // TestDashboardReceivingLabelNamesStoredProvider proves the live dashboard
 // snapshot names a domain's receiving provider as soon as one is stored, with no
-// receiver ready. The Antler MX setup wizard stores the provider on its first
+// receiver ready. The Tusk MX setup wizard stores the provider on its first
 // step, so an operator who starts a setup and cancels it part-way leaves a
 // configured domain: without the label the row keeps drawing its pre-open amber
 // "Add" beside the live light until a manual reload, even though the domain
@@ -149,8 +149,8 @@ func TestDashboardReceivingLabelNamesStoredProvider(t *testing.T) {
 	t.Parallel()
 	svc, h, u, _, _ := httpFixture(t)
 	ctx := context.Background()
-	svc.AntlerEndpoints = fixedAntler{receivers: []mxdial.AntlerReceiver{
-		{ID: "antler-1", SessionURL: "https://antler1.example.test", SMTPHostname: "antler1.example.test", MXPriority: 10},
+	svc.TuskEndpoints = fixedTusk{receivers: []mxdial.TuskReceiver{
+		{ID: "tusk-1", SessionURL: "https://tusk1.example.test", SMTPHostname: "tusk1.example.test", MXPriority: 10},
 	}}
 	domain, err := svc.Store.CreateDomain(ctx, u.AccountID, "partial.example.com")
 	if err != nil {
@@ -181,11 +181,11 @@ func TestDashboardReceivingLabelNamesStoredProvider(t *testing.T) {
 	// The wizard's first step writes the provider and contact email but names no
 	// receiver yet: the state a cancelled setup leaves behind.
 	if _, _, err := svc.SaveDomainReceivingConfig(ctx, u.AccountID, domain.ID, "dialmx", map[string]any{
-		"service": mxdial.ServiceAntler, "contact_email": "ops@example.test",
+		"service": mxdial.ServiceTusk, "contact_email": "ops@example.test",
 	}, false); err != nil {
-		t.Fatalf("antler save: %v", err)
+		t.Fatalf("tusk save: %v", err)
 	}
-	if got := label(); got != "Antler MX" {
-		t.Fatalf("partly configured domain label = %q, want Antler MX", got)
+	if got := label(); got != "Tusk MX" {
+		t.Fatalf("partly configured domain label = %q, want Tusk MX", got)
 	}
 }

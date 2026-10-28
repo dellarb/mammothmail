@@ -18,13 +18,13 @@ func TestDialMXStatusObserverPublishesHealthEvent(t *testing.T) {
 	t.Parallel()
 	svc, _, u, domain, _ := httpFixture(t)
 	ctx := context.Background()
-	svc.AntlerEndpoints = fixedAntler{receivers: []mxdial.AntlerReceiver{
-		{ID: "antler-1", SessionURL: "https://antler-health.example.test", SMTPHostname: "antler-health.example.test", MXPriority: 10},
+	svc.TuskEndpoints = fixedTusk{receivers: []mxdial.TuskReceiver{
+		{ID: "tusk-1", SessionURL: "https://tusk-health.example.test", SMTPHostname: "tusk-health.example.test", MXPriority: 10},
 	}}
 	if _, _, err := svc.SaveDomainReceivingConfig(ctx, u.AccountID, domain.ID, "dialmx", map[string]any{
-		"service": mxdial.ServiceAntler, "contact_email": "ops@example.test",
+		"service": mxdial.ServiceTusk, "contact_email": "ops@example.test",
 	}, false); err != nil {
-		t.Fatalf("antler save: %v", err)
+		t.Fatalf("tusk save: %v", err)
 	}
 
 	m := mxdial.New(svc.DialMXBackend(), mxdial.Config{

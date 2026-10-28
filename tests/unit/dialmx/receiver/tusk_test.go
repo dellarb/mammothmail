@@ -14,11 +14,11 @@ import (
 	"github.com/dellarb/mailmoose/internal/transport/mxdial"
 )
 
-// TestAntlerRegistrationMetadataLogged proves the optional Antler MX contact
+// TestTuskRegistrationMetadataLogged proves the optional Tusk MX contact
 // email and setup id supplied on DomainAuth are carried through the domain
 // proof and message handoff metadata, and that the proof itself still succeeds
 // from DNS authority alone (the metadata is never authority).
-func TestAntlerRegistrationMetadataLogged(t *testing.T) {
+func TestTuskRegistrationMetadataLogged(t *testing.T) {
 	t.Parallel()
 	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
 	dns := func(context.Context, string) ([]string, error) { return []string{mxwire.DomainTXT("key1", pub)}, nil }
@@ -61,10 +61,10 @@ func TestAntlerRegistrationMetadataLogged(t *testing.T) {
 	})
 }
 
-// TestAntlerMalformedMetadataDroppedWithoutRejectingProof proves a malformed
+// TestTuskMalformedMetadataDroppedWithoutRejectingProof proves a malformed
 // contact email or setup id never becomes authority: it is dropped and the
 // DNS-anchored proof still authenticates the domain.
-func TestAntlerMalformedMetadataDroppedWithoutRejectingProof(t *testing.T) {
+func TestTuskMalformedMetadataDroppedWithoutRejectingProof(t *testing.T) {
 	t.Parallel()
 	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
 	dns := func(context.Context, string) ([]string, error) { return []string{mxwire.DomainTXT("key1", pub)}, nil }

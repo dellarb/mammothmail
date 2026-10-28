@@ -136,10 +136,10 @@ func main() {
 	dialManager := mxdial.New(svc.DialMXBackend(), mxdial.Config{DataDir: cfg.DataDir, MaxMessageBytes: cfg.MaxMessageBytes, MaxTransactions: cfg.InboundConcurrency, TLSConfig: dialTLS, AllowPrivateDestinations: !cfg.RequirePublicOutbound()})
 	svc.DialMX = dialManager
 	svc.InstallDialMXStatusObserver()
-	// Antler MX endpoints are resolved live from the repository manifest at
+	// Tusk MX endpoints are resolved live from the repository manifest at
 	// setup-save time, cached, and fall back to the embedded copy. The snapshot
 	// is stored per domain, so existing setups never move.
-	svc.AntlerEndpoints = mxdial.DefaultAntlerResolver()
+	svc.TuskEndpoints = mxdial.DefaultTuskResolver()
 	dialCtx, dialCancel := context.WithCancel(context.Background())
 	dialDone := make(chan struct{})
 	go func() {

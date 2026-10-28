@@ -6008,7 +6008,7 @@ function generateBearerSecret() {
 })();
 
 (function () {
-  // Live DKIM published-record light on the sending dialog, mirroring the Antler
+  // Live DKIM published-record light on the sending dialog, mirroring the Tusk
   // status poll: while the dialog is open, refresh the record dot so an operator
   // watching DNS propagate sees it turn green without closing and reopening. The
   // server reads the watcher's shared cached verdict, so a poll is cheap and
@@ -6146,9 +6146,9 @@ function generateBearerSecret() {
 (function () {
   // syncDialMXService materialises or removes the editable Receiver URLs field
   // for a Dial MX provider group. The field is only valid for the custom
-  // service, so for Antler MX it is kept out of the DOM; switching the service
+  // service, so for Tusk MX it is kept out of the DOM; switching the service
   // select to custom injects the field from its inert <template>. The server
-  // independently rejects a supplied receiver_urls for Antler.
+  // independently rejects a supplied receiver_urls for Tusk.
   function syncDialMXService(group) {
     if (!group || group.getAttribute('data-provider') !== 'dialmx') {
       return;
@@ -6271,7 +6271,7 @@ function generateBearerSecret() {
 })();
 
 (function () {
-  document.querySelectorAll('form[data-antler-domain]').forEach(function (form) {
+  document.querySelectorAll('form[data-tusk-domain]').forEach(function (form) {
     var dlg = form.closest('dialog');
     var provider = form.querySelector('.provider-select');
     var group = form.querySelector('[data-provider="dialmx"]');
@@ -6288,31 +6288,31 @@ function generateBearerSecret() {
     // statuses embedded on the form, so it opens complete and already matching
     // the dashboard light it was opened from; the first poll then reconciles it.
     var connectors = [];
-    try { connectors = JSON.parse(form.dataset.antlerConnectors || '[]') || []; } catch (err) { connectors = []; }
+    try { connectors = JSON.parse(form.dataset.tuskConnectors || '[]') || []; } catch (err) { connectors = []; }
     var initialStatuses = [];
-    try { initialStatuses = JSON.parse(form.dataset.antlerStatus || '[]') || []; } catch (err) { initialStatuses = []; }
+    try { initialStatuses = JSON.parse(form.dataset.tuskStatus || '[]') || []; } catch (err) { initialStatuses = []; }
     // The copy-ready DNS records and the shared extra-MX verdict are seeded too,
     // so the status view's fix prompts and "additional MX servers" warning paint
     // on open rather than waiting for the first fetch to land.
     var initialInstructions = null;
-    try { initialInstructions = JSON.parse(form.dataset.antlerInstructions || 'null'); } catch (err) { initialInstructions = null; }
+    try { initialInstructions = JSON.parse(form.dataset.tuskInstructions || 'null'); } catch (err) { initialInstructions = null; }
     var initialUnexpected = [];
-    try { initialUnexpected = JSON.parse(form.dataset.antlerUnexpected || '[]') || []; } catch (err) { initialUnexpected = []; }
+    try { initialUnexpected = JSON.parse(form.dataset.tuskUnexpected || '[]') || []; } catch (err) { initialUnexpected = []; }
     var initialDNS = [];
-    try { initialDNS = JSON.parse(form.dataset.antlerDns || '[]') || []; } catch (err) { initialDNS = []; }
-    // The recorded Antler manifest source is seeded too, so the status view says
+    try { initialDNS = JSON.parse(form.dataset.tuskDns || '[]') || []; } catch (err) { initialDNS = []; }
+    // The recorded Tusk manifest source is seeded too, so the status view says
     // where its receiver set came from — the live GitHub manifest or the built-in
     // defaults — without waiting for the first fetch.
     var initialManifest = null;
-    try { initialManifest = JSON.parse(form.dataset.antlerManifest || 'null'); } catch (err) { initialManifest = null; }
+    try { initialManifest = JSON.parse(form.dataset.tuskManifest || 'null'); } catch (err) { initialManifest = null; }
     var providerLabel = provider.previousElementSibling;
     var serviceLabel = service.previousElementSibling;
     var danger = dlg.querySelector('.dialog-danger');
-    var rotate = dlg.querySelector('form[data-antler-regenerate]');
+    var rotate = dlg.querySelector('form[data-tusk-regenerate]');
     if (statusMode && danger) {
       // Keep key rotation and removing the receiving config; drop the
       // provider-specific Worker-secret regenerate, which is not part of an
-      // Antler MX setup.
+      // Tusk MX setup.
       Array.prototype.forEach.call(danger.children, function (child) {
         var button = child.querySelector('button');
         var remove = button && button.className.indexOf('danger') !== -1;
@@ -6320,34 +6320,34 @@ function generateBearerSecret() {
       });
     }
     var close = dlg.querySelector('[data-close-dialog]');
-    var endpoint = '/ui/domains/' + encodeURIComponent(form.dataset.antlerDomain) + '/receiving/setup';
+    var endpoint = '/ui/domains/' + encodeURIComponent(form.dataset.tuskDomain) + '/receiving/setup';
     var step = 0, busy = false, ready = false, rotating = false;
     var state = null, savedEmail = null, timer = null;
     var wizard = document.createElement('section');
-    wizard.className = 'antler-wizard';
-    wizard.innerHTML = '<p class="antler-progress" aria-live="polite"></p>' +
-      '<section data-antler-step="0"><h3>Contact email</h3></section>' +
-      '<section data-antler-step="1" hidden><h3>Publish your DNS records</h3><p class="muted small">Add these records at your DNS provider. You can continue while DNS propagates.</p><div class="antler-records"></div></section>' +
-      '<section data-antler-step="2" hidden><h3>Antler receivers</h3><p class="muted small">One ready receiver is enough to continue. Other receivers can connect later.</p><div class="antler-receivers"></div></section>' +
-      '<section data-antler-step="3" hidden><h3>Receiver authentication enforcement</h3><p class="muted small">Moderate marks mail as spam when DMARC fails, or both SPF and DKIM fail. Hard marks mail as spam when any of SPF, DKIM, or DMARC fails. Missing or inconclusive results alone do not count as failures.</p></section>' +
-      '<section data-antler-step="4" hidden><h3>Custom receivers</h3><p class="muted small">Enter comma-separated HTTPS receiver URLs. Your receiver operator must also provide the SMTP hostname to use in your MX records.</p><label>Receiver URLs</label><input class="antler-custom-urls" placeholder="https://mx.example.com"></section>' +
-      '<div class="antler-checks" hidden><p class="antler-check-note" role="status"></p><p class="antler-manifest-note muted small" hidden></p></div>' +
-      '<p class="antler-error error" role="alert" hidden></p>';
+    wizard.className = 'tusk-wizard';
+    wizard.innerHTML = '<p class="tusk-progress" aria-live="polite"></p>' +
+      '<section data-tusk-step="0"><h3>Contact email</h3></section>' +
+      '<section data-tusk-step="1" hidden><h3>Publish your DNS records</h3><p class="muted small">Add these records at your DNS provider. You can continue while DNS propagates.</p><div class="tusk-records"></div></section>' +
+      '<section data-tusk-step="2" hidden><h3>Tusk receivers</h3><p class="muted small">One ready receiver is enough to continue. Other receivers can connect later.</p><div class="tusk-receivers"></div></section>' +
+      '<section data-tusk-step="3" hidden><h3>Receiver authentication enforcement</h3><p class="muted small">Moderate marks mail as spam when DMARC fails, or both SPF and DKIM fail. Hard marks mail as spam when any of SPF, DKIM, or DMARC fails. Missing or inconclusive results alone do not count as failures.</p></section>' +
+      '<section data-tusk-step="4" hidden><h3>Custom receivers</h3><p class="muted small">Enter comma-separated HTTPS receiver URLs. Your receiver operator must also provide the SMTP hostname to use in your MX records.</p><label>Receiver URLs</label><input class="tusk-custom-urls" placeholder="https://mx.example.com"></section>' +
+      '<div class="tusk-checks" hidden><p class="tusk-check-note" role="status"></p><p class="tusk-manifest-note muted small" hidden></p></div>' +
+      '<p class="tusk-error error" role="alert" hidden></p>';
     // A plain-language intro shown on the first step only, mirroring the
-    // "Inbound: Antler MX" extract in docs/EMAIL_PROVIDERS.md: what the service
+    // "Inbound: Tusk MX" extract in docs/EMAIL_PROVIDERS.md: what the service
     // is, the mail-flow diagram, and the outbound-only connection, without the
     // setup steps the wizard already walks through.
     var intro = document.createElement('section');
-    intro.className = 'antler-intro';
-    intro.innerHTML = '<p>Antler MX is a <b>free hosted SMTP receiver for your domain</b>. It is included as a receiving option in MailMoose. You do not need to run another container, open inbound SMTP ports, or expose your web interface to the internet.</p>' +
-      '<figure><img src="/assets/antler-mx-diagram.svg" alt="Public senders deliver to the hosted Antler relay; MailMoose connects to it outbound, so no inbound port forwarding is needed."></figure>' +
-      '<p>MailMoose makes an <b>outbound connection</b> to the hosted Antler receivers. Antler accepts incoming SMTP and passes messages to MailMoose over that connection. Antler is a receiving relay, not a hosted mailbox or an outgoing mail service.</p>' +
-      '<p class="muted small">Antler MX is a community service, provided on a best-efforts basis — there is no uptime guarantee.</p>';
+    intro.className = 'tusk-intro';
+    intro.innerHTML = '<p>Tusk MX is a <b>free hosted SMTP receiver for your domain</b>. It is included as a receiving option in MailMoose. You do not need to run another container, open inbound SMTP ports, or expose your web interface to the internet.</p>' +
+      '<figure><img src="/assets/tusk-mx-diagram.svg" alt="Public senders deliver to the hosted Tusk relay; MailMoose connects to it outbound, so no inbound port forwarding is needed."></figure>' +
+      '<p>MailMoose makes an <b>outbound connection</b> to the hosted Tusk receivers. Tusk accepts incoming SMTP and passes messages to MailMoose over that connection. Tusk is a receiving relay, not a hosted mailbox or an outgoing mail service.</p>' +
+      '<p class="muted small">Tusk MX is a community service, provided on a best-efforts basis — there is no uptime guarantee.</p>';
     group.appendChild(wizard);
-    wizard.insertBefore(intro, wizard.querySelector('[data-antler-step="0"]'));
+    wizard.insertBefore(intro, wizard.querySelector('[data-tusk-step="0"]'));
     function moveField(input, index) {
       var label = input.previousElementSibling;
-      var panel = wizard.querySelector('[data-antler-step="' + index + '"]');
+      var panel = wizard.querySelector('[data-tusk-step="' + index + '"]');
       if (label && label.tagName === 'LABEL') { panel.appendChild(label); }
       panel.appendChild(input);
     }
@@ -6356,19 +6356,19 @@ function generateBearerSecret() {
     var advancedLabel = document.createElement('label');
     var advanced = document.createElement('input');
     advanced.type = 'checkbox'; advanced.checked = custom;
-    advanced.className = 'antler-advanced';
+    advanced.className = 'tusk-advanced';
     advanced.style = 'width:auto;margin-right:8px';
     advancedLabel.appendChild(advanced);
     advancedLabel.appendChild(document.createTextNode('Advanced: use custom receivers'));
-    wizard.querySelector('[data-antler-step="0"]').appendChild(advancedLabel);
-    var urls = wizard.querySelector('.antler-custom-urls');
+    wizard.querySelector('[data-tusk-step="0"]').appendChild(advancedLabel);
+    var urls = wizard.querySelector('.tusk-custom-urls');
     var existingURLs = group.querySelector('[name="cfg_dialmx_receiver_urls"]');
     urls.value = existingURLs ? existingURLs.value : '';
     advanced.addEventListener('change', function () { custom = advanced.checked; update(); });
-    var panels = wizard.querySelectorAll('[data-antler-step]');
-    var checksRow = wizard.querySelector('.antler-checks');
-    var note = wizard.querySelector('.antler-check-note');
-    var error = wizard.querySelector('.antler-error');
+    var panels = wizard.querySelectorAll('[data-tusk-step]');
+    var checksRow = wizard.querySelector('.tusk-checks');
+    var note = wizard.querySelector('.tusk-check-note');
+    var error = wizard.querySelector('.tusk-error');
     // The saved status view carries its editable settings (authentication
     // enforcement and contact email) below the status records, so the status
     // picture reads first. The two field groups are the same nodes the wizard
@@ -6377,15 +6377,15 @@ function generateBearerSecret() {
     var emailLabel = email.previousElementSibling;
     var enforcementLabel = enforcement.previousElementSibling;
     var settings = document.createElement('section');
-    settings.className = 'antler-settings';
-    settings.setAttribute('data-antler-settings', '');
+    settings.className = 'tusk-settings';
+    settings.setAttribute('data-tusk-settings', '');
     var settingsHeading = document.createElement('h3');
     settingsHeading.textContent = 'Settings';
     settings.appendChild(settingsHeading);
     // The inherited setup is read-only: its settings belong to the owning domain.
     // That caveat is the only note the section needs; the non-inherited view is
     // self-explanatory from the field labels alone.
-    var inherited = form.dataset.antlerInherited || '';
+    var inherited = form.dataset.tuskInherited || '';
     if (inherited) {
       settingsHeading.textContent = 'Settings (inherited)';
       var settingsNote = document.createElement('p');
@@ -6394,8 +6394,8 @@ function generateBearerSecret() {
       settings.appendChild(settingsNote);
     }
     wizard.appendChild(settings);
-    var step0Panel = wizard.querySelector('[data-antler-step="0"]');
-    var step3Panel = wizard.querySelector('[data-antler-step="3"]');
+    var step0Panel = wizard.querySelector('[data-tusk-step="0"]');
+    var step3Panel = wizard.querySelector('[data-tusk-step="3"]');
     function placeFields() {
       var target = statusMode ? settings : null;
       [[emailLabel, email, target || step0Panel], [enforcementLabel, enforcement, target || step3Panel]]
@@ -6408,7 +6408,7 @@ function generateBearerSecret() {
     // Back is part of the dialog's bottom navigation, not the upper form.
     var footer = save.closest('.dialog-actions');
     var back = document.createElement('button');
-    back.type = 'button'; back.className = 'secondary antler-back'; back.textContent = 'Back'; back.hidden = true;
+    back.type = 'button'; back.className = 'secondary tusk-back'; back.textContent = 'Back'; back.hidden = true;
     if (footer) { footer.insertBefore(back, footer.firstChild); }
     function active() { return provider.value === 'dialmx'; }
     function fail(message) { error.textContent = message; error.hidden = !message; }
@@ -6467,7 +6467,7 @@ function generateBearerSecret() {
       if (isReady(status)) { return 'green'; }
       return ['connecting', 'deferred'].indexOf(status.state) !== -1 ? 'amber' : 'red';
     }
-    // receiverLabel renders the specific Antler reason next to the traffic light,
+    // receiverLabel renders the specific Tusk reason next to the traffic light,
     // not a generic word: the receiver's own verdict ("not in MX", "key
     // unavailable", "authentication failed") is the most precise thing we know
     // about that connector. The raw reason stays in the row's tooltip. The HTTP
@@ -6562,7 +6562,7 @@ function generateBearerSecret() {
       var needTXT = txt && txt.state && txt.state !== 'ok';
       var needMX = mx && mx.state && mx.state !== 'ok';
       if (!needTXT && !needMX) { return block; }
-      block.className = 'antler-dns-remediation';
+      block.className = 'tusk-dns-remediation';
       if (needTXT && instructions.txt_value) {
         var txtPrompt = 'Domain not authorized — a receiver could not verify this domain\x27s TXT key. Check this TXT record:';
         block.appendChild(remediationLine(txtPrompt, [
@@ -6572,7 +6572,7 @@ function generateBearerSecret() {
         ]));
       }
       if (needMX && (instructions.mx || []).length) {
-        var mxPrompt = 'An Antler receiver reports that its hostname is not in this domain\x27s MX records. Check these MX records:';
+        var mxPrompt = 'A Tusk receiver reports that its hostname is not in this domain\x27s MX records. Check these MX records:';
         var mxRecords = instructions.mx || [];
         if (mxRecords.length) { block.appendChild(remediationLine(mxPrompt, [])); }
         mxRecords.forEach(function (record, index) {
@@ -6585,7 +6585,7 @@ function generateBearerSecret() {
       return block;
     }
     // unexpectedMXBlock warns that the domain's MX records name servers which are
-    // not Antler receivers. Mail may still be delivered via a ready Antler
+    // not Tusk receivers. Mail may still be delivered via a ready Tusk
     // receiver, but routing is ambiguous, so the dashboard light is amber and this
     // block names the offending servers and suggests removing them. It is empty
     // when no extra records are published.
@@ -6593,9 +6593,9 @@ function generateBearerSecret() {
       var block = document.createElement('div');
       var extra = data.unexpected_mx || [];
       if (!extra.length) { return block; }
-      block.className = 'antler-dns-remediation antler-extra-mx';
+      block.className = 'tusk-dns-remediation tusk-extra-mx';
       var p = document.createElement('p');
-      p.textContent = 'Additional MX servers exist for ' + domainName + '. Mail may not be delivered via Antler. Remove these records unless you intend them:';
+      p.textContent = 'Additional MX servers exist for ' + domainName + '. Mail may not be delivered via Tusk. Remove these records unless you intend them:';
       block.appendChild(p);
       extra.forEach(function (host) {
         var line = document.createElement('div');
@@ -6614,11 +6614,11 @@ function generateBearerSecret() {
     // pendingCell is one status-table cell for a connector with no live status
     // yet: an amber dot and a "Pending" label, shaped like a live status cell so
     // the two are indistinguishable to a reader. While a check is in flight the
-    // amber dots animate (see .antler-checking).
+    // amber dots animate (see .tusk-checking).
     function pendingCell(parent) {
       var td = document.createElement('td');
       var dot = document.createElement('span');
-      dot.className = 'antler-light amber';
+      dot.className = 'tusk-light amber';
       var label = document.createElement('span');
       label.textContent = 'Pending';
       td.appendChild(dot);
@@ -6637,7 +6637,7 @@ function generateBearerSecret() {
       if (status) {
         var td = document.createElement('td');
         var dot = document.createElement('span');
-        dot.className = 'antler-light ' + receiverLightClass(status);
+        dot.className = 'tusk-light ' + receiverLightClass(status);
         var label = document.createElement('span');
         label.textContent = receiverLabel(status);
         if (status.reason) { label.title = status.reason; }
@@ -6651,10 +6651,10 @@ function generateBearerSecret() {
     }
     // statusTable builds the saved-status connector table. Each row is named by a
     // connector hostname and its status light is filled from the live status set
-    // when one matches: seeded on open from the embedded data-antler-status, then
+    // when one matches: seeded on open from the embedded data-tusk-status, then
     // refreshed on every poll. A connector with no live status yet reads amber
     // "Pending". The connector names are the only thing not known from live
-    // status, so they come from data-antler-connectors; a status with no matching
+    // status, so they come from data-tusk-connectors; a status with no matching
     // connector (a custom-service receiver_url, which has no embedded MX list) is
     // appended so it is never dropped.
     function statusTable(connectors, statuses) {
@@ -6666,7 +6666,7 @@ function generateBearerSecret() {
       });
       var used = [];
       var table = document.createElement('table');
-      table.className = 'antler-dns-table antler-status-table';
+      table.className = 'tusk-dns-table tusk-status-table';
       var head = document.createElement('tr');
       ['Connector', 'Status'].forEach(function (title) {
         var th = document.createElement('th');
@@ -6703,13 +6703,13 @@ function generateBearerSecret() {
     // reconciles on the same code path rather than flashing rows without their
     // remediation.
     function renderStatusRecords(statuses, instructions, dns, unexpected, domainName, mxName) {
-      var records = wizard.querySelector('.antler-records');
+      var records = wizard.querySelector('.tusk-records');
       records.replaceChildren();
       records.appendChild(statusTable(connectors, statuses));
       records.appendChild(unexpectedMXBlock({ unexpected_mx: unexpected || [] }, domainName));
       records.appendChild(remediationBlock(receivingDNS(statuses), instructions || {}, mxName));
     }
-    // mxRecordName is the name column for the Antler MX rows. A two-label name
+    // mxRecordName is the name column for the Tusk MX rows. A two-label name
     // is a zone apex and reads best as the provider's "@". A name with more
     // labels is a subdomain of some zone, so it must never be "@": that would
     // publish the MX on the parent zone and send mail to the wrong domain. Spell
@@ -6728,34 +6728,34 @@ function generateBearerSecret() {
     // describes the receivers the published MX records already point at, not the
     // manifest's state today.
     function renderManifest(manifest) {
-      var manifestNote = wizard.querySelector('.antler-manifest-note');
+      var manifestNote = wizard.querySelector('.tusk-manifest-note');
       if (!manifest) { manifestNote.hidden = true; manifestNote.textContent = ''; return; }
       if (manifest.source === 'embedded') {
-        manifestNote.textContent = 'Could not fetch Antler receivers from GitHub — using built-in defaults';
+        manifestNote.textContent = 'Could not fetch Tusk receivers from GitHub — using built-in defaults';
       } else {
         var when = '';
         var at = manifest.at ? new Date(manifest.at) : null;
         // An unparsable timestamp still names the source; only the time is dropped.
         if (at && !isNaN(at.getTime())) { when = ' at ' + at.toLocaleTimeString(); }
-        manifestNote.textContent = 'Antler receivers updated from GitHub' + when;
+        manifestNote.textContent = 'Tusk receivers updated from GitHub' + when;
       }
       manifestNote.hidden = false;
     }
     function renderSkeleton(connectors) {
       var instructions = initialInstructions || {};
-      var domainName = form.dataset.antlerDomainName || '';
+      var domainName = form.dataset.tuskDomainName || '';
       renderStatusRecords(initialStatuses, instructions, initialDNS, initialUnexpected, domainName, mxRecordName(domainName));
       renderManifest(initialManifest);
     }
     // renderReceivers fills the wizard's own receivers step (used while setting
     // up, not the saved status view) from the live status set.
     function renderReceivers(statuses) {
-      var receivers = wizard.querySelector('.antler-receivers'); receivers.replaceChildren();
+      var receivers = wizard.querySelector('.tusk-receivers'); receivers.replaceChildren();
       (statuses || []).forEach(function (status) {
         var row = document.createElement('p');
         row.textContent = (status.smtp_hostname || status.receiver_url) + ' — ' + receiverLabel(status) + (status.reason ? ' · ' + status.reason : '');
         var light = document.createElement('span');
-        light.className = 'antler-light ' + receiverLightClass(status);
+        light.className = 'tusk-light ' + receiverLightClass(status);
         row.prepend(light);
         receivers.appendChild(row);
       });
@@ -6767,12 +6767,12 @@ function generateBearerSecret() {
       countdown = null;
       // The poll carries the record on every read; the seeded copy covers a
       // payload that predates it (or no save yet), so the line never flashes off.
-      renderManifest(data.antler_manifest || initialManifest);
+      renderManifest(data.tusk_manifest || initialManifest);
       var instructions = data.instructions || {};
       ready = (data.status || []).some(isReady);
-      var records = wizard.querySelector('.antler-records');
+      var records = wizard.querySelector('.tusk-records');
       records.replaceChildren();
-      var domainName = form.dataset.antlerDomainName || '';
+      var domainName = form.dataset.tuskDomainName || '';
       // A subdomain must publish its MX at its own fully-qualified name, never
       // the parent zone's "@" (see mxRecordName).
       var mxName = mxRecordName(domainName);
@@ -6795,7 +6795,7 @@ function generateBearerSecret() {
       // Record lights follow receiver proof; no report is unknown, not missing.
       function light(state, title) {
         var span = document.createElement('span');
-        span.className = 'antler-light ' + (state === 'ok' ? 'green' : state === null ? 'amber' : 'red');
+        span.className = 'tusk-light ' + (state === 'ok' ? 'green' : state === null ? 'amber' : 'red');
         span.title = title || '';
         var text = document.createElement('span');
         text.textContent = state === 'ok' ? 'Matching'
@@ -6811,7 +6811,7 @@ function generateBearerSecret() {
         return light(!entry ? null : entry.state, (entry && entry.reason) || '');
       }
       var table = document.createElement('table');
-      table.className = 'antler-dns-table antler-record-table';
+      table.className = 'tusk-dns-table tusk-record-table';
       var head = document.createElement('tr');
       ['Name', 'Type', 'Priority', 'Value', 'Status', ''].forEach(function (title) {
         var th = document.createElement('th');
@@ -6833,8 +6833,8 @@ function generateBearerSecret() {
         [name, type, priority, value].forEach(function (text, index) {
           var td = document.createElement('td');
           td.textContent = text;
-          if (index === 0) { td.className = 'antler-name'; }
-          if (index === 3) { td.className = 'antler-value'; }
+          if (index === 0) { td.className = 'tusk-name'; }
+          if (index === 3) { td.className = 'tusk-value'; }
           tr.appendChild(td);
         });
         statusCell(tr, rowLight);
@@ -6843,7 +6843,7 @@ function generateBearerSecret() {
         copy.type = 'button'; copy.className = 'secondary'; copy.textContent = 'Copy value';
         window.mailmooseCopy.wire(copy, {
           text: value,
-          select: function () { return tr.querySelector('.antler-value'); }
+          select: function () { return tr.querySelector('.tusk-value'); }
         });
         action.appendChild(copy); tr.appendChild(action); tbody.appendChild(tr);
       }
@@ -6855,12 +6855,12 @@ function generateBearerSecret() {
       // The receivers step of the new-setup wizard carries the same inline
       // remediation, so an operator completing setup can publish the MX record
       // they need without leaving the step.
-      wizard.querySelector('.antler-receivers').appendChild(remediationBlock(receivingDNS(data.status), instructions, mxName));
+      wizard.querySelector('.tusk-receivers').appendChild(remediationBlock(receivingDNS(data.status), instructions, mxName));
       update();
     }
     function update() {
       var enabled = active();
-      dlg.classList.toggle('antler-dialog', enabled);
+      dlg.classList.toggle('tusk-dialog', enabled);
       if (rotate) { rotate.querySelector('button').disabled = busy || rotating; }
       provider.disabled = busy;
       service.disabled = busy || provider.value !== 'dialmx';
@@ -6883,36 +6883,36 @@ function generateBearerSecret() {
         // The moved fields still belong to the custom form.
         wizard.hidden = provider.value !== 'dialmx';
         panels.forEach(function (panel, index) { panel.hidden = index !== 0 && index !== 3; });
-        wizard.querySelector('.antler-progress').hidden = true;
+        wizard.querySelector('.tusk-progress').hidden = true;
         back.hidden = true;
-        wizard.querySelector('.antler-checks').hidden = true;
-        wizard.querySelectorAll('h3, [data-antler-step] > p').forEach(function (el) { el.hidden = true; });
+        wizard.querySelector('.tusk-checks').hidden = true;
+        wizard.querySelectorAll('h3, [data-tusk-step] > p').forEach(function (el) { el.hidden = true; });
         if (provider.value === 'dialmx') { save.textContent = 'Save'; save.disabled = false; }
         return;
       }
-      wizard.querySelectorAll('h3, [data-antler-step] > p').forEach(function (el) { el.hidden = false; });
-      wizard.querySelector('.antler-progress').hidden = statusMode;
-      wizard.querySelector('.antler-progress').textContent = rotating ? 'New receiving key · DNS → Receivers' : custom ? 'Custom Antler MX · Contact → Receiver URLs → DNS → Receivers → Enforcement' : 'Antler MX · Contact → DNS → Receivers → Enforcement';
-      wizard.querySelector('[data-antler-step="1"] h3').textContent = rotating ? 'Replace your authorization TXT record' : statusMode ? 'Antler MX status' : 'Publish your DNS records';
-      wizard.querySelector('[data-antler-step="1"] > p').textContent = rotating ? 'The previous key is invalid. Replace the existing authorization TXT record with the new value below. Your MX records stay the same. Receiving can resume once DNS propagates and a receiver reconnects.' : 'Add these records at your DNS provider. You can continue while DNS propagates.';
+      wizard.querySelectorAll('h3, [data-tusk-step] > p').forEach(function (el) { el.hidden = false; });
+      wizard.querySelector('.tusk-progress').hidden = statusMode;
+      wizard.querySelector('.tusk-progress').textContent = rotating ? 'New receiving key · DNS → Receivers' : custom ? 'Custom Tusk MX · Contact → Receiver URLs → DNS → Receivers → Enforcement' : 'Tusk MX · Contact → DNS → Receivers → Enforcement';
+      wizard.querySelector('[data-tusk-step="1"] h3').textContent = rotating ? 'Replace your authorization TXT record' : statusMode ? 'Tusk MX status' : 'Publish your DNS records';
+      wizard.querySelector('[data-tusk-step="1"] > p').textContent = rotating ? 'The previous key is invalid. Replace the existing authorization TXT record with the new value below. Your MX records stay the same. Receiving can resume once DNS propagates and a receiver reconnects.' : 'Add these records at your DNS provider. You can continue while DNS propagates.';
       // The saved-status view replaces the separate receiver panel with a
       // per-receiver status table and an inline remediation block.
       panels.forEach(function (panel, index) {
         panel.hidden = statusMode ? (index === 2 || index === 3 || index === 4 || (index === 0 && custom)) : index !== step;
       });
       advancedLabel.hidden = statusMode;
-      // The intro belongs to the hosted Antler service and reads once, so it
+      // The intro belongs to the hosted Tusk service and reads once, so it
       // shows on the first step only — not in the saved status view, and not
       // when the operator has switched to custom receivers.
       intro.hidden = statusMode || custom || step !== 0;
       if (statusMode) {
-        wizard.querySelector('[data-antler-step="0"] h3').hidden = true;
-        var contactDescription = wizard.querySelector('[data-antler-step="0"] p');
+        wizard.querySelector('[data-tusk-step="0"] h3').hidden = true;
+        var contactDescription = wizard.querySelector('[data-tusk-step="0"] p');
         if (contactDescription) { contactDescription.hidden = true; }
-        wizard.querySelector('[data-antler-step="1"] h3').textContent = 'Antler MX status';
-        wizard.querySelector('[data-antler-step="2"] p').hidden = true;
+        wizard.querySelector('[data-tusk-step="1"] h3').textContent = 'Tusk MX status';
+        wizard.querySelector('[data-tusk-step="2"] p').hidden = true;
       }
-      if (statusMode) { wizard.querySelector('[data-antler-step="1"] > p').hidden = true; }
+      if (statusMode) { wizard.querySelector('[data-tusk-step="1"] > p').hidden = true; }
       // The footer's close control reads "Close" once the saved status view is
       // showing and "Cancel" while the setup wizard is still running. It is
       // relabelled here on every update, not once at init, because the wizard
@@ -6923,7 +6923,7 @@ function generateBearerSecret() {
       // its receiver step can.
       back.hidden = statusMode || (step === 0 && !entered) || (rotating && step === 1);
       back.disabled = busy;
-      wizard.querySelector('.antler-checks').hidden = statusMode ? false : (step !== 1 && step !== 2);
+      wizard.querySelector('.tusk-checks').hidden = statusMode ? false : (step !== 1 && step !== 2);
       placeFields();
       settings.hidden = !statusMode;
       save.hidden = statusMode ? (custom || inherited || !settingsDirty()) : false;
@@ -6947,8 +6947,8 @@ function generateBearerSecret() {
       // While a check is in flight, pending amber dots animate as spinners so a
       // not-yet-resolved connector or DNS record reads as "in progress" rather
       // than a settled amber state.
-      wizard.querySelector('.antler-records').classList.toggle('antler-checking', busy);
-      wizard.querySelector('.antler-receivers').classList.toggle('antler-checking', busy);
+      wizard.querySelector('.tusk-records').classList.toggle('tusk-checking', busy);
+      wizard.querySelector('.tusk-receivers').classList.toggle('tusk-checking', busy);
       // The countdown is a wizard affordance only: the saved status view is
       // buttonless and counter-free (it reconciles on SSE and a slow poll).
       var showChecks = !statusMode && (step === 1 || step === 2);
@@ -7083,11 +7083,11 @@ function generateBearerSecret() {
       }) : api('GET').then(function (data) {
         // Reopening an existing setup must retain its enforcement until the
         // final step, and must not unnecessarily resolve a new receiver set.
-        if (data.provider === 'dialmx' && data.config.service === (custom ? 'custom' : 'antler')) { state = data; }
+        if (data.provider === 'dialmx' && data.config.service === (custom ? 'custom' : 'tusk')) { state = data; }
       });
       beforeSave.then(function () {
         if (!finishing && !custom && state && state.config.contact_email === email.value) { return state; }
-        var config = { service: custom ? 'custom' : 'antler', enforcement: finishing ? enforcement.value : (state && state.config.enforcement || 'moderate') };
+        var config = { service: custom ? 'custom' : 'tusk', enforcement: finishing ? enforcement.value : (state && state.config.enforcement || 'moderate') };
         if (custom) { config.receiver_urls = urls.value; } else { config.contact_email = email.value; }
         return api('PUT', config);
       }).then(function (data) {
@@ -7110,7 +7110,7 @@ function generateBearerSecret() {
     function domainMatches(event) {
       var changed = '';
       try { changed = ((JSON.parse(event.data || '{}') || {}).payload || {}).domain_id || ''; } catch (err) { changed = ''; }
-      return !changed || !form.dataset.antlerDomain || changed === form.dataset.antlerDomain;
+      return !changed || !form.dataset.tuskDomain || changed === form.dataset.tuskDomain;
     }
     function onPush(event) {
       if (!active() || !dlg.open) { return; }
@@ -7841,7 +7841,7 @@ function generateBearerSecret() {
 
   // setReceivingLabel writes the server's provider label into a dashboard Domain
   // row's Receiving cell. The row is server-rendered, so a receiving dialog that
-  // stores a provider while the row is on screen — the Antler MX wizard saves the
+  // stores a provider while the row is on screen — the Tusk MX wizard saves the
   // provider on its first step, so cancelling a setup part-way leaves the domain
   // configured — would otherwise keep drawing an amber "Add" beside a live light
   // until a manual reload. An empty label leaves the cell alone: a domain with no
@@ -8235,7 +8235,7 @@ function generateBearerSecret() {
       window.mailmooseStatus.disconnected();
       return;
     }
-    // Share the one connection so other UI closures (the Antler MX status
+    // Share the one connection so other UI closures (the Tusk MX status
     // dialog) can listen for named events without opening a second stream. The
     // event tells them the source object was replaced, so a dialog open across a
     // reconnect re-attaches to the live stream instead of a dead one.

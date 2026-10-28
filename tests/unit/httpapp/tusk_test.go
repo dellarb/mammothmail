@@ -18,24 +18,24 @@ import (
 	"github.com/dellarb/mailmoose/internal/transport/mxdial"
 )
 
-// fixedAntler is a deterministic Antler endpoint resolver for HTTP tests. A
+// fixedTusk is a deterministic Tusk endpoint resolver for HTTP tests. A
 // resolver with no source answers as the live GitHub manifest did, with a fixed
 // fetch time so the rendered manifest line is deterministic.
-type fixedAntler struct {
-	receivers []mxdial.AntlerReceiver
-	source    mxdial.AntlerSource
+type fixedTusk struct {
+	receivers []mxdial.TuskReceiver
+	source    mxdial.TuskSource
 	fetchedAt time.Time
 }
 
-func (f fixedAntler) Receivers(context.Context) (mxdial.AntlerEndpointSet, error) {
+func (f fixedTusk) Receivers(context.Context) (mxdial.TuskEndpointSet, error) {
 	source, at := f.source, f.fetchedAt
 	if source == "" {
-		source = mxdial.AntlerSourceGitHub
+		source = mxdial.TuskSourceGitHub
 		if at.IsZero() {
 			at = time.Date(2026, 10, 18, 5, 12, 3, 0, time.UTC)
 		}
 	}
-	return mxdial.AntlerEndpointSet{Receivers: f.receivers, Source: source, FetchedAt: at}, nil
+	return mxdial.TuskEndpointSet{Receivers: f.receivers, Source: source, FetchedAt: at}, nil
 }
 
 // fakeResolver serves deterministic MX/TXT answers to the watcher.
@@ -110,22 +110,22 @@ func dnsLights(t *testing.T, body map[string]any) map[string]string {
 	return out
 }
 
-// TestDialMXAntlerReceivingAPITrafficLights proves the receiving API returns the
-// Antler instructions, live receiver status and the watcher's published-record
+// TestDialMXTuskReceivingAPITrafficLights proves the receiving API returns the
+// Tusk instructions, live receiver status and the watcher's published-record
 // checks, with a green verdict for matching MX and TXT records and a red one for a
 // mismatch.
-func TestDialMXAntlerReceivingAPITrafficLights(t *testing.T) {
+func TestDialMXTuskReceivingAPITrafficLights(t *testing.T) {
 	t.Parallel()
 	svc, _, u, domain, _ := httpFixture(t)
 	ctx := context.Background()
-	svc.AntlerEndpoints = fixedAntler{receivers: []mxdial.AntlerReceiver{
-		{ID: "antler-1", SessionURL: "https://antler1.example.test", SMTPHostname: "antler1.example.test", MXPriority: 10},
-		{ID: "antler-2", SessionURL: "https://antler2.example.test", SMTPHostname: "antler2.example.test", MXPriority: 20},
+	svc.TuskEndpoints = fixedTusk{receivers: []mxdial.TuskReceiver{
+		{ID: "tusk-1", SessionURL: "https://tusk1.example.test", SMTPHostname: "tusk1.example.test", MXPriority: 10},
+		{ID: "tusk-2", SessionURL: "https://tusk2.example.test", SMTPHostname: "tusk2.example.test", MXPriority: 20},
 	}}
 	if _, _, err := svc.SaveDomainReceivingConfig(ctx, u.AccountID, domain.ID, "dialmx", map[string]any{
-		"service": mxdial.ServiceAntler, "contact_email": "ops@example.test",
+		"service": mxdial.ServiceTusk, "contact_email": "ops@example.test",
 	}, false); err != nil {
-		t.Fatalf("antler save: %v", err)
+		t.Fatalf("tusk save: %v", err)
 	}
 	cred, err := svc.Store.GetDialMXCredential(ctx, u.AccountID, domain.ID)
 	if err != nil {
@@ -135,7 +135,7 @@ func TestDialMXAntlerReceivingAPITrafficLights(t *testing.T) {
 	txtValue := mxwire.DomainTXT(cred.KeyID, pub)
 
 	watchDNS(svc, fakeResolver{
-		mx:  []*net.MX{{Host: "antler1.example.test.", Pref: 10}, {Host: "antler2.example.test.", Pref: 20}},
+		mx:  []*net.MX{{Host: "tusk1.example.test.", Pref: 10}, {Host: "tusk2.example.test.", Pref: 20}},
 		txt: []string{txtValue},
 	})
 	srv := httpapp.New(svc, nil)
@@ -158,6 +158,12 @@ func TestDialMXAntlerReceivingAPITrafficLights(t *testing.T) {
 		return body
 	}
 	body := do()
+	if body["config"].(map[string]any)["service"] != "tusk" {
+		t.Fatalf("config must use the Tusk service: %v", body["config"])
+	}
+	if _, exists := body["antler_manifest"]; exists {
+		t.Fatal("response exposes the legacy manifest field")
+	}
 	statuses, _ := body["status"].([]any)
 	if len(statuses) != 2 {
 		t.Fatalf("must show both receivers before their first connection: %v", body["status"])
@@ -170,14 +176,14 @@ func TestDialMXAntlerReceivingAPITrafficLights(t *testing.T) {
 	}
 
 	instr, _ := body["instructions"].(map[string]any)
-	if instr == nil || instr["service"] != "antler" || instr["contact_email"] != "ops@example.test" {
-		t.Fatalf("instructions missing Antler metadata: %v", body["instructions"])
+	if instr == nil || instr["service"] != "tusk" || instr["contact_email"] != "ops@example.test" {
+		t.Fatalf("instructions missing Tusk metadata: %v", body["instructions"])
 	}
 	mx, _ := instr["mx"].([]any)
 	if len(mx) != 2 {
 		t.Fatalf("instructions missing MX records: %v", instr["mx"])
 	}
-	if mx[0].(map[string]any)["hostname"] != "antler1.example.test" {
+	if mx[0].(map[string]any)["hostname"] != "tusk1.example.test" {
 		t.Fatalf("unexpected MX instruction: %v", mx[0])
 	}
 	if instr["txt_name"] != "_mailmoose-mx."+domain.Name {
@@ -185,12 +191,12 @@ func TestDialMXAntlerReceivingAPITrafficLights(t *testing.T) {
 	}
 	// The response says where the receiver set came from, so the wizard can state
 	// whether setup used the live GitHub manifest or the built-in defaults.
-	manifest, _ := body["antler_manifest"].(map[string]any)
-	if manifest == nil || manifest["source"] != string(mxdial.AntlerSourceGitHub) {
-		t.Fatalf("antler_manifest = %v, want the github source", body["antler_manifest"])
+	manifest, _ := body["tusk_manifest"].(map[string]any)
+	if manifest == nil || manifest["source"] != string(mxdial.TuskSourceGitHub) {
+		t.Fatalf("tusk_manifest = %v, want the github source", body["tusk_manifest"])
 	}
 	if manifest["at"] != "2026-10-18T05:12:03Z" {
-		t.Fatalf("antler_manifest fetch time = %v", manifest["at"])
+		t.Fatalf("tusk_manifest fetch time = %v", manifest["at"])
 	}
 
 	lights := dnsLights(t, body)
@@ -215,7 +221,7 @@ func TestDialMXAntlerReceivingAPITrafficLights(t *testing.T) {
 	// The dashboard setup panel renders the MX instructions and the lights.
 	cookie, _ := uiSession(t, svc, u.ID)
 	page := domainGet(t, h, cookie, "/?domain="+domain.ID+"&kind=receiving&provider=dialmx")
-	for _, want := range []string{"Antler MX", "10 antler1.example.test", "ops@example.test", "dns-light"} {
+	for _, want := range []string{"Tusk MX", "10 tusk1.example.test", "ops@example.test", "dns-light"} {
 		if !strings.Contains(page.Body.String(), want) {
 			t.Fatalf("setup panel missing %q", want)
 		}
@@ -223,7 +229,7 @@ func TestDialMXAntlerReceivingAPITrafficLights(t *testing.T) {
 	// The status view draws its connector table from the set embedded on the
 	// form, so the rendered attributes must exist and name a connector hostname
 	// (html/template escapes them for attribute context).
-	for _, attr := range []string{`data-antler-connectors=`, `data-antler-status=`} {
+	for _, attr := range []string{`data-tusk-connectors=`, `data-tusk-status=`} {
 		i := strings.Index(page.Body.String(), attr)
 		if i < 0 {
 			t.Fatalf("receiving form missing %s attribute", attr)
@@ -232,7 +238,7 @@ func TestDialMXAntlerReceivingAPITrafficLights(t *testing.T) {
 		if end := strings.IndexByte(attrVal, '>'); end >= 0 {
 			attrVal = attrVal[:end]
 		}
-		if !strings.Contains(attrVal, "antler1.example.test") {
+		if !strings.Contains(attrVal, "tusk1.example.test") {
 			t.Fatalf("%s data missing receiver hostname: %q", attr, attrVal)
 		}
 	}
@@ -245,13 +251,13 @@ func TestDialMXWatcherRefreshesVerdict(t *testing.T) {
 	t.Parallel()
 	svc, _, u, domain, _ := httpFixture(t)
 	ctx := context.Background()
-	svc.AntlerEndpoints = fixedAntler{receivers: []mxdial.AntlerReceiver{
-		{ID: "antler-1", SessionURL: "https://antler1.example.test", SMTPHostname: "antler1.example.test", MXPriority: 10},
+	svc.TuskEndpoints = fixedTusk{receivers: []mxdial.TuskReceiver{
+		{ID: "tusk-1", SessionURL: "https://tusk1.example.test", SMTPHostname: "tusk1.example.test", MXPriority: 10},
 	}}
 	if _, _, err := svc.SaveDomainReceivingConfig(ctx, u.AccountID, domain.ID, "dialmx", map[string]any{
-		"service": mxdial.ServiceAntler, "contact_email": "ops@example.test",
+		"service": mxdial.ServiceTusk, "contact_email": "ops@example.test",
 	}, false); err != nil {
-		t.Fatalf("antler save: %v", err)
+		t.Fatalf("tusk save: %v", err)
 	}
 	cred, err := svc.Store.GetDialMXCredential(ctx, u.AccountID, domain.ID)
 	if err != nil {
@@ -261,7 +267,7 @@ func TestDialMXWatcherRefreshesVerdict(t *testing.T) {
 	txtValue := mxwire.DomainTXT(cred.KeyID, pub)
 
 	res := &switchableResolver{}
-	res.set([]*net.MX{{Host: "antler1.example.test.", Pref: 10}}, []string{txtValue})
+	res.set([]*net.MX{{Host: "tusk1.example.test.", Pref: 10}}, []string{txtValue})
 	watchDNS(svc, res)
 
 	srv := httpapp.New(svc, nil)
@@ -288,7 +294,7 @@ func TestDialMXWatcherRefreshesVerdict(t *testing.T) {
 	}
 	// The record changes to a key that no longer matches the domain's exact key;
 	// the next watcher pass republishes the verdict.
-	res.set([]*net.MX{{Host: "antler1.example.test.", Pref: 10}}, []string{
+	res.set([]*net.MX{{Host: "tusk1.example.test.", Pref: 10}}, []string{
 		"v=MM1; k=ed25519; id=other; p=" + base64.StdEncoding.EncodeToString(pub),
 	})
 	svc.DNS.CheckOnce(ctx)
@@ -304,13 +310,13 @@ func TestDialMXReceivingStatusRunsNoLookup(t *testing.T) {
 	t.Parallel()
 	svc, _, u, domain, _ := httpFixture(t)
 	ctx := context.Background()
-	svc.AntlerEndpoints = fixedAntler{receivers: []mxdial.AntlerReceiver{
-		{ID: "antler-1", SessionURL: "https://antler1.example.test", SMTPHostname: "antler1.example.test", MXPriority: 10},
+	svc.TuskEndpoints = fixedTusk{receivers: []mxdial.TuskReceiver{
+		{ID: "tusk-1", SessionURL: "https://tusk1.example.test", SMTPHostname: "tusk1.example.test", MXPriority: 10},
 	}}
 	if _, _, err := svc.SaveDomainReceivingConfig(ctx, u.AccountID, domain.ID, "dialmx", map[string]any{
-		"service": mxdial.ServiceAntler, "contact_email": "ops@example.test",
+		"service": mxdial.ServiceTusk, "contact_email": "ops@example.test",
 	}, false); err != nil {
-		t.Fatalf("antler save: %v", err)
+		t.Fatalf("tusk save: %v", err)
 	}
 	cred, err := svc.Store.GetDialMXCredential(ctx, u.AccountID, domain.ID)
 	if err != nil {
@@ -318,7 +324,7 @@ func TestDialMXReceivingStatusRunsNoLookup(t *testing.T) {
 	}
 	pub, _ := base64.RawURLEncoding.DecodeString(cred.PublicKey)
 	res := &switchableResolver{}
-	res.set([]*net.MX{{Host: "antler1.example.test.", Pref: 10}}, []string{mxwire.DomainTXT(cred.KeyID, pub)})
+	res.set([]*net.MX{{Host: "tusk1.example.test.", Pref: 10}}, []string{mxwire.DomainTXT(cred.KeyID, pub)})
 	watchDNS(svc, res)
 	baseMX, baseTX := res.counts()
 
@@ -357,23 +363,23 @@ func TestDialMXExtraMXVerdictIsSharedAcrossSurfaces(t *testing.T) {
 	t.Parallel()
 	svc, _, u, domain, _ := httpFixture(t)
 	ctx := context.Background()
-	svc.AntlerEndpoints = fixedAntler{receivers: []mxdial.AntlerReceiver{
-		{ID: "antler-1", SessionURL: "https://antler1.example.test", SMTPHostname: "antler1.example.test", MXPriority: 10},
+	svc.TuskEndpoints = fixedTusk{receivers: []mxdial.TuskReceiver{
+		{ID: "tusk-1", SessionURL: "https://tusk1.example.test", SMTPHostname: "tusk1.example.test", MXPriority: 10},
 	}}
 	if _, _, err := svc.SaveDomainReceivingConfig(ctx, u.AccountID, domain.ID, "dialmx", map[string]any{
-		"service": mxdial.ServiceAntler, "contact_email": "ops@example.test",
+		"service": mxdial.ServiceTusk, "contact_email": "ops@example.test",
 	}, false); err != nil {
-		t.Fatalf("antler save: %v", err)
+		t.Fatalf("tusk save: %v", err)
 	}
 	// A ready receiver and a rogue MX record appear together: amber, with the
 	// rogue host named.
 	m := mxdial.New(svc.DialMXBackend(), mxdial.Config{DataDir: svc.Config.DataDir, AllowPrivateDestinations: true})
 	m.SetStatusForTest(domain.Name, []mxdial.Status{{
-		ReceiverURL: "https://antler1.example.test", State: mxdial.StatusActive, SMTPHostname: "antler1.example.test",
+		ReceiverURL: "https://tusk1.example.test", State: mxdial.StatusActive, SMTPHostname: "tusk1.example.test",
 	}})
 	svc.DialMX = m
 	watchDNS(svc, fakeResolver{mx: []*net.MX{
-		{Host: "antler1.example.test.", Pref: 10},
+		{Host: "tusk1.example.test.", Pref: 10},
 		{Host: "old.example.test.", Pref: 20},
 	}})
 
@@ -424,16 +430,16 @@ func TestDialMXStaleVerdictSelfClears(t *testing.T) {
 	// Serial: it ages the watcher's verdict past the demand floor.
 	svc, _, u, domain, _ := httpFixture(t)
 	ctx := context.Background()
-	svc.AntlerEndpoints = fixedAntler{receivers: []mxdial.AntlerReceiver{
-		{ID: "antler-1", SessionURL: "https://antler1.example.test", SMTPHostname: "antler1.example.test", MXPriority: 10},
+	svc.TuskEndpoints = fixedTusk{receivers: []mxdial.TuskReceiver{
+		{ID: "tusk-1", SessionURL: "https://tusk1.example.test", SMTPHostname: "tusk1.example.test", MXPriority: 10},
 	}}
 	if _, _, err := svc.SaveDomainReceivingConfig(ctx, u.AccountID, domain.ID, "dialmx", map[string]any{
-		"service": mxdial.ServiceAntler, "contact_email": "ops@example.test",
+		"service": mxdial.ServiceTusk, "contact_email": "ops@example.test",
 	}, false); err != nil {
-		t.Fatalf("antler save: %v", err)
+		t.Fatalf("tusk save: %v", err)
 	}
 	res := &switchableResolver{}
-	res.set([]*net.MX{{Host: "antler1.example.test.", Pref: 10}, {Host: "old.example.test.", Pref: 20}}, nil)
+	res.set([]*net.MX{{Host: "tusk1.example.test.", Pref: 10}, {Host: "old.example.test.", Pref: 20}}, nil)
 	watchDNS(svc, res)
 	srv := httpapp.New(svc, nil)
 	h := srv.Handler()
@@ -457,7 +463,7 @@ func TestDialMXStaleVerdictSelfClears(t *testing.T) {
 	}
 
 	// The operator removes the record; the cached verdict is now stale.
-	res.set([]*net.MX{{Host: "antler1.example.test.", Pref: 10}}, nil)
+	res.set([]*net.MX{{Host: "tusk1.example.test.", Pref: 10}}, nil)
 	waitPastDemandFloor()
 	if !svc.DNS.Stale(domain.ID) {
 		t.Fatal("verdict must read as stale once it is past the demand floor")
@@ -478,8 +484,8 @@ func TestDialMXStaleVerdictSelfClears(t *testing.T) {
 
 // formAttr returns the value of one quoted attribute on the receiving form.// html/template escapes any inner quote as &#34;, so the next quote ends this
 // attribute's value — cutting at the tag's ">" instead would run into every
-// later attribute (including data-antler-dns, whose extra-MX verdict would then
-// satisfy an assertion meant for data-antler-unexpected alone).
+// later attribute (including data-tusk-dns, whose extra-MX verdict would then
+// satisfy an assertion meant for data-tusk-unexpected alone).
 func formAttr(t *testing.T, body, attr string) string {
 	t.Helper()
 	i := strings.Index(body, attr)
@@ -502,13 +508,13 @@ func TestDialMXStatusViewSeedsFixPrompts(t *testing.T) {
 	t.Parallel()
 	svc, _, u, domain, _ := httpFixture(t)
 	ctx := context.Background()
-	svc.AntlerEndpoints = fixedAntler{receivers: []mxdial.AntlerReceiver{
-		{ID: "antler-1", SessionURL: "https://antler1.example.test", SMTPHostname: "antler1.example.test", MXPriority: 10},
+	svc.TuskEndpoints = fixedTusk{receivers: []mxdial.TuskReceiver{
+		{ID: "tusk-1", SessionURL: "https://tusk1.example.test", SMTPHostname: "tusk1.example.test", MXPriority: 10},
 	}}
 	if _, _, err := svc.SaveDomainReceivingConfig(ctx, u.AccountID, domain.ID, "dialmx", map[string]any{
-		"service": mxdial.ServiceAntler, "contact_email": "ops@example.test",
+		"service": mxdial.ServiceTusk, "contact_email": "ops@example.test",
 	}, false); err != nil {
-		t.Fatalf("antler save: %v", err)
+		t.Fatalf("tusk save: %v", err)
 	}
 	cred, err := svc.Store.GetDialMXCredential(ctx, u.AccountID, domain.ID)
 	if err != nil {
@@ -519,11 +525,11 @@ func TestDialMXStatusViewSeedsFixPrompts(t *testing.T) {
 	// instructions, the rogue-host warning and both DNS checks.
 	m := mxdial.New(svc.DialMXBackend(), mxdial.Config{DataDir: svc.Config.DataDir, AllowPrivateDestinations: true})
 	m.SetStatusForTest(domain.Name, []mxdial.Status{{
-		ReceiverURL: "https://antler1.example.test", State: mxdial.StatusActive, SMTPHostname: "antler1.example.test",
+		ReceiverURL: "https://tusk1.example.test", State: mxdial.StatusActive, SMTPHostname: "tusk1.example.test",
 	}})
 	svc.DialMX = m
 	watchDNS(svc, fakeResolver{
-		mx:  []*net.MX{{Host: "antler1.example.test.", Pref: 10}, {Host: "old.example.test.", Pref: 20}},
+		mx:  []*net.MX{{Host: "tusk1.example.test.", Pref: 10}, {Host: "old.example.test.", Pref: 20}},
 		txt: []string{"v=MM1; k=ed25519; id=other; p=" + base64.StdEncoding.EncodeToString(pub)},
 	})
 
@@ -535,21 +541,21 @@ func TestDialMXStatusViewSeedsFixPrompts(t *testing.T) {
 	body := page.Body.String()
 	attrValue := func(attr string) string { return formAttr(t, body, attr) }
 	// The copy-ready instructions carry the MX record the operator must publish.
-	if got := attrValue(`data-antler-instructions=`); !strings.Contains(got, "antler1.example.test") {
+	if got := attrValue(`data-tusk-instructions=`); !strings.Contains(got, "tusk1.example.test") {
 		t.Fatalf("seeded instructions missing the MX record: %q", got)
 	}
 	// The shared extra-MX verdict names the rogue host.
-	if got := attrValue(`data-antler-unexpected=`); !strings.Contains(got, "old.example.test") {
+	if got := attrValue(`data-tusk-unexpected=`); !strings.Contains(got, "old.example.test") {
 		t.Fatalf("seeded extra-MX verdict missing the rogue host: %q", got)
 	}
 	// The DNS checks flag both the TXT mismatch and the rogue MX.
-	if got := attrValue(`data-antler-dns=`); !strings.Contains(got, "mismatch") || !strings.Contains(got, "old.example.test") {
+	if got := attrValue(`data-tusk-dns=`); !strings.Contains(got, "mismatch") || !strings.Contains(got, "old.example.test") {
 		t.Fatalf("seeded DNS checks missing the TXT mismatch or rogue host: %q", got)
 	}
 	// The manifest record seeds too, so the status view says where its receiver set
 	// came from the moment it opens. html/template escapes the inner quotes for the
 	// attribute context, so this reads the values rather than the JSON spelling.
-	if got := attrValue(`data-antler-manifest=`); !strings.Contains(got, "github") || !strings.Contains(got, "2026-10-18T05:12:03Z") {
+	if got := attrValue(`data-tusk-manifest=`); !strings.Contains(got, "github") || !strings.Contains(got, "2026-10-18T05:12:03Z") {
 		t.Fatalf("seeded manifest record missing its source or fetch time: %q", got)
 	}
 }
@@ -563,18 +569,18 @@ func TestDialMXStatusViewSeedsExtraMXWithoutAReadyReceiver(t *testing.T) {
 	t.Parallel()
 	svc, _, u, domain, _ := httpFixture(t)
 	ctx := context.Background()
-	svc.AntlerEndpoints = fixedAntler{receivers: []mxdial.AntlerReceiver{
-		{ID: "antler-1", SessionURL: "https://antler1.example.test", SMTPHostname: "antler1.example.test", MXPriority: 10},
+	svc.TuskEndpoints = fixedTusk{receivers: []mxdial.TuskReceiver{
+		{ID: "tusk-1", SessionURL: "https://tusk1.example.test", SMTPHostname: "tusk1.example.test", MXPriority: 10},
 	}}
 	if _, _, err := svc.SaveDomainReceivingConfig(ctx, u.AccountID, domain.ID, "dialmx", map[string]any{
-		"service": mxdial.ServiceAntler, "contact_email": "ops@example.test",
+		"service": mxdial.ServiceTusk, "contact_email": "ops@example.test",
 	}, false); err != nil {
-		t.Fatalf("antler save: %v", err)
+		t.Fatalf("tusk save: %v", err)
 	}
 	// No receiver status is injected and no dial manager is installed, so the
 	// domain is configured but nothing has authenticated: the light is red.
 	watchDNS(svc, fakeResolver{mx: []*net.MX{
-		{Host: "antler1.example.test.", Pref: 10},
+		{Host: "tusk1.example.test.", Pref: 10},
 		{Host: "old.example.test.", Pref: 20},
 	}})
 
@@ -590,27 +596,27 @@ func TestDialMXStatusViewSeedsExtraMXWithoutAReadyReceiver(t *testing.T) {
 		t.Fatalf("receiving light should be danger with no ready receiver")
 	}
 	// The rogue host is seeded on the form, so the warning paints on open.
-	if got := formAttr(t, body, `data-antler-unexpected=`); !strings.Contains(got, "old.example.test") {
+	if got := formAttr(t, body, `data-tusk-unexpected=`); !strings.Contains(got, "old.example.test") {
 		t.Fatalf("seeded extra-MX verdict missing the rogue host: %q", got)
 	}
 }
 
-// TestDialMXAntlerPartialMXSetIsHealthy proves the MX check treats the receiver
+// TestDialMXTuskPartialMXSetIsHealthy proves the MX check treats the receiver
 // set as redundancy: publishing only one of two advertised receivers is "ok",
 // matched lists the receiver that is actually pointed at, and the other is left
 // out of matched (so its connector row is not painted by the aggregate check).
-func TestDialMXAntlerPartialMXSetIsHealthy(t *testing.T) {
+func TestDialMXTuskPartialMXSetIsHealthy(t *testing.T) {
 	t.Parallel()
 	svc, _, u, domain, _ := httpFixture(t)
 	ctx := context.Background()
-	svc.AntlerEndpoints = fixedAntler{receivers: []mxdial.AntlerReceiver{
-		{ID: "antler-1", SessionURL: "https://antler1.example.test", SMTPHostname: "antler1.example.test", MXPriority: 10},
-		{ID: "antler-2", SessionURL: "https://antler2.example.test", SMTPHostname: "antler2.example.test", MXPriority: 20},
+	svc.TuskEndpoints = fixedTusk{receivers: []mxdial.TuskReceiver{
+		{ID: "tusk-1", SessionURL: "https://tusk1.example.test", SMTPHostname: "tusk1.example.test", MXPriority: 10},
+		{ID: "tusk-2", SessionURL: "https://tusk2.example.test", SMTPHostname: "tusk2.example.test", MXPriority: 20},
 	}}
 	if _, _, err := svc.SaveDomainReceivingConfig(ctx, u.AccountID, domain.ID, "dialmx", map[string]any{
-		"service": mxdial.ServiceAntler, "contact_email": "ops@example.test",
+		"service": mxdial.ServiceTusk, "contact_email": "ops@example.test",
 	}, false); err != nil {
-		t.Fatalf("antler save: %v", err)
+		t.Fatalf("tusk save: %v", err)
 	}
 	cred, err := svc.Store.GetDialMXCredential(ctx, u.AccountID, domain.ID)
 	if err != nil {
@@ -619,7 +625,7 @@ func TestDialMXAntlerPartialMXSetIsHealthy(t *testing.T) {
 	pub, _ := base64.RawURLEncoding.DecodeString(cred.PublicKey)
 	// Only the priority-10 receiver is published.
 	watchDNS(svc, fakeResolver{
-		mx:  []*net.MX{{Host: "antler1.example.test.", Pref: 10}},
+		mx:  []*net.MX{{Host: "tusk1.example.test.", Pref: 10}},
 		txt: []string{mxwire.DomainTXT(cred.KeyID, pub)},
 	})
 	srv := httpapp.New(svc, nil)
@@ -651,23 +657,51 @@ func TestDialMXAntlerPartialMXSetIsHealthy(t *testing.T) {
 		t.Fatalf("partial MX set = %v, want ok", (*mx)["state"])
 	}
 	matched, _ := (*mx)["matched"].([]any)
-	if len(matched) != 1 || matched[0] != "antler1.example.test" {
+	if len(matched) != 1 || matched[0] != "tusk1.example.test" {
 		t.Fatalf("matched = %v, want only the published receiver", matched)
+	}
+}
+
+func TestReceivingAPIUsesTuskService(t *testing.T) {
+	t.Parallel()
+	svc, h, u, domain, _ := httpFixture(t)
+	svc.TuskEndpoints = fixedTusk{receivers: []mxdial.TuskReceiver{
+		{ID: "tusk-1", SessionURL: "https://tusk1.example.test", SMTPHostname: "tusk1.example.test", MXPriority: 10},
+	}}
+	_, key, err := svc.Store.CreateAPIKey(context.Background(), u.AccountID, "admin", true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		service string
+		status  int
+	}{{"antler", http.StatusBadRequest}, {"tusk", http.StatusOK}} {
+		t.Run(tc.service, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPut, "/v1/admin/domains/"+domain.ID+"/receiving",
+				strings.NewReader(`{"provider":"dialmx","config":{"service":"`+tc.service+`","contact_email":"ops@example.test"}}`))
+			req.Header.Set("Authorization", "Bearer "+key)
+			req.Header.Set("Content-Type", "application/json")
+			rr := httptest.NewRecorder()
+			h.ServeHTTP(rr, req)
+			if rr.Code != tc.status {
+				t.Fatalf("service %s: %d %s", tc.service, rr.Code, rr.Body.String())
+			}
+		})
 	}
 }
 
 // The browser uses session-scoped setup routes; saves require the existing
 // CSRF guard, and reads require a browser session.
-func TestAntlerWizardSessionSetup(t *testing.T) {
+func TestTuskWizardSessionSetup(t *testing.T) {
 	t.Parallel()
 	svc, h, u, domain, _ := httpFixture(t)
-	svc.AntlerEndpoints = fixedAntler{receivers: []mxdial.AntlerReceiver{
-		{ID: "antler-1", SessionURL: "https://antler1.example.test", SMTPHostname: "antler1.example.test", MXPriority: 10},
+	svc.TuskEndpoints = fixedTusk{receivers: []mxdial.TuskReceiver{
+		{ID: "tusk-1", SessionURL: "https://tusk1.example.test", SMTPHostname: "tusk1.example.test", MXPriority: 10},
 	}}
 	cookie, csrf := uiSession(t, svc, u.ID)
 	path := "/ui/domains/" + domain.ID + "/receiving/setup"
 	do := func(method, token string) *httptest.ResponseRecorder {
-		req := httptest.NewRequest(method, path, strings.NewReader(`{"provider":"dialmx","config":{"service":"antler","contact_email":"ops@example.test","enforcement":"moderate"}}`))
+		req := httptest.NewRequest(method, path, strings.NewReader(`{"provider":"dialmx","config":{"service":"tusk","contact_email":"ops@example.test","enforcement":"moderate"}}`))
 		req.AddCookie(cookie)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-CSRF-Token", token)
@@ -681,7 +715,7 @@ func TestAntlerWizardSessionSetup(t *testing.T) {
 	if rr := do(http.MethodPut, csrf); rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), `"txt_value"`) {
 		t.Fatalf("session setup save: %d %s", rr.Code, rr.Body.String())
 	}
-	if rr := do(http.MethodGet, ""); rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), `"smtp_hostname":"antler1.example.test"`) {
+	if rr := do(http.MethodGet, ""); rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), `"smtp_hostname":"tusk1.example.test"`) {
 		t.Fatalf("session status check: %d %s", rr.Code, rr.Body.String())
 	}
 	before, err := svc.Store.GetDomainReceivingConfig(context.Background(), u.AccountID, domain.ID)
@@ -697,7 +731,7 @@ func TestAntlerWizardSessionSetup(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A changed manifest must not change endpoints during an email-only save.
-	svc.AntlerEndpoints = fixedAntler{receivers: []mxdial.AntlerReceiver{
+	svc.TuskEndpoints = fixedTusk{receivers: []mxdial.TuskReceiver{
 		{ID: "new", SessionURL: "https://new.example.test", SMTPHostname: "new.example.test", MXPriority: 10},
 	}}
 	update := func(token string) *httptest.ResponseRecorder {
@@ -729,7 +763,7 @@ func TestAntlerWizardSessionSetup(t *testing.T) {
 	if afterValues["enforcement"] != "hard" {
 		t.Fatalf("enforcement not saved in the same request: %v", afterValues["enforcement"])
 	}
-	for _, field := range []string{"receiver_urls", "antler_receivers", "setup_id", "antler_manifest_source", "antler_manifest_at"} {
+	for _, field := range []string{"receiver_urls", "tusk_receivers", "setup_id", "tusk_manifest_source", "tusk_manifest_at"} {
 		if afterValues[field] != beforeValues[field] {
 			t.Fatalf("settings save changed %s", field)
 		}
@@ -746,20 +780,20 @@ func TestAntlerWizardSessionSetup(t *testing.T) {
 	}
 }
 
-// TestDialMXAntlerDialogHidesReceiverURLs pins that the editable Receiver URLs
-// field is not present in the Antler MX dialog (it lives only in an inert
+// TestDialMXTuskDialogHidesReceiverURLs pins that the editable Receiver URLs
+// field is not present in the Tusk MX dialog (it lives only in an inert
 // template), but is present and editable for the custom service.
-func TestDialMXAntlerDialogHidesReceiverURLs(t *testing.T) {
+func TestDialMXTuskDialogHidesReceiverURLs(t *testing.T) {
 	t.Parallel()
 	svc, _, u, domain, _ := httpFixture(t)
 	ctx := context.Background()
-	svc.AntlerEndpoints = fixedAntler{receivers: []mxdial.AntlerReceiver{
-		{ID: "antler-1", SessionURL: "https://antler1.example.test", SMTPHostname: "antler1.example.test", MXPriority: 10},
+	svc.TuskEndpoints = fixedTusk{receivers: []mxdial.TuskReceiver{
+		{ID: "tusk-1", SessionURL: "https://tusk1.example.test", SMTPHostname: "tusk1.example.test", MXPriority: 10},
 	}}
 	if _, _, err := svc.SaveDomainReceivingConfig(ctx, u.AccountID, domain.ID, "dialmx", map[string]any{
-		"service": mxdial.ServiceAntler, "contact_email": "ops@example.test",
+		"service": mxdial.ServiceTusk, "contact_email": "ops@example.test",
 	}, false); err != nil {
-		t.Fatalf("antler save: %v", err)
+		t.Fatalf("tusk save: %v", err)
 	}
 	srv := httpapp.New(svc, nil)
 	h := srv.Handler()
@@ -768,10 +802,10 @@ func TestDialMXAntlerDialogHidesReceiverURLs(t *testing.T) {
 	settings := providerGroupHTML(t, body, "dialmx")
 
 	if strings.Contains(stripDialMXReceiverTemplate(settings), `name="cfg_dialmx_receiver_urls"`) {
-		t.Fatalf("Antler dialog renders an editable receiver_urls input:\n%s", settings)
+		t.Fatalf("Tusk dialog renders an editable receiver_urls input:\n%s", settings)
 	}
 	if !strings.Contains(settings, `<template class="dialmx-receiver-urls-field">`) {
-		t.Fatalf("Antler dialog is missing the inert receiver_urls template:\n%s", settings)
+		t.Fatalf("Tusk dialog is missing the inert receiver_urls template:\n%s", settings)
 	}
 
 	// A custom setup keeps the editable input.
@@ -790,15 +824,15 @@ func TestDialMXAntlerDialogHidesReceiverURLs(t *testing.T) {
 	}
 }
 
-// TestDialMXAntlerAPIRejectsReceiverURLs proves the receiving API refuses a
-// client-supplied receiver_urls for the Antler service, so a crafted request
+// TestDialMXTuskAPIRejectsReceiverURLs proves the receiving API refuses a
+// client-supplied receiver_urls for the Tusk service, so a crafted request
 // cannot point the domain at an arbitrary receiver.
-func TestDialMXAntlerAPIRejectsReceiverURLs(t *testing.T) {
+func TestDialMXTuskAPIRejectsReceiverURLs(t *testing.T) {
 	t.Parallel()
 	svc, _, u, domain, _ := httpFixture(t)
 	ctx := context.Background()
-	svc.AntlerEndpoints = fixedAntler{receivers: []mxdial.AntlerReceiver{
-		{ID: "antler-1", SessionURL: "https://antler1.example.test", SMTPHostname: "antler1.example.test", MXPriority: 10},
+	svc.TuskEndpoints = fixedTusk{receivers: []mxdial.TuskReceiver{
+		{ID: "tusk-1", SessionURL: "https://tusk1.example.test", SMTPHostname: "tusk1.example.test", MXPriority: 10},
 	}}
 	srv := httpapp.New(svc, nil)
 	h := srv.Handler()
@@ -807,13 +841,13 @@ func TestDialMXAntlerAPIRejectsReceiverURLs(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := "/v1/admin/domains/" + domain.ID + "/receiving"
-	req := httptest.NewRequest(http.MethodPut, path, strings.NewReader(`{"provider":"dialmx","config":{"service":"antler","contact_email":"ops@example.test","receiver_urls":"https://evil.example.test"}}`))
+	req := httptest.NewRequest(http.MethodPut, path, strings.NewReader(`{"provider":"dialmx","config":{"service":"tusk","contact_email":"ops@example.test","receiver_urls":"https://evil.example.test"}}`))
 	req.Header.Set("Authorization", "Bearer "+key)
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
-	if rr.Code != http.StatusBadRequest || !strings.Contains(rr.Body.String(), "Antler MX") {
-		t.Fatalf("injected receiver_urls for antler: %d %s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusBadRequest || !strings.Contains(rr.Body.String(), "Tusk MX") {
+		t.Fatalf("injected receiver_urls for tusk: %d %s", rr.Code, rr.Body.String())
 	}
 	// The rejected save must not have replaced the fixture's existing provider
 	// nor stored the injected URL.
@@ -868,11 +902,11 @@ func TestDialMXReceivingAPIRejectsReceiverURLsArray(t *testing.T) {
 	}
 }
 
-// TestDialMXCustomReceivingAPIHasNoAntlerInstructions pins that a custom setup
-// keeps its manual receiver URLs and does not advertise Antler MX records, and
+// TestDialMXCustomReceivingAPIHasNoTuskInstructions pins that a custom setup
+// keeps its manual receiver URLs and does not advertise Tusk MX records, and
 // that the watcher computes no MX check for it (the MX hostname is the operator's
 // own), only the TXT check.
-func TestDialMXCustomReceivingAPIHasNoAntlerInstructions(t *testing.T) {
+func TestDialMXCustomReceivingAPIHasNoTuskInstructions(t *testing.T) {
 	t.Parallel()
 	svc, _, u, domain, _ := httpFixture(t)
 	ctx := context.Background()
@@ -909,7 +943,7 @@ func TestDialMXCustomReceivingAPIHasNoAntlerInstructions(t *testing.T) {
 	}
 
 	// The dialog must prefill the custom service so a save cannot silently
-	// migrate a legacy configuration to Antler MX.
+	// migrate a legacy configuration to Tusk MX.
 	cookie, _ := uiSession(t, svc, u.ID)
 	page := domainGet(t, h, cookie, "/?domain="+domain.ID+"&kind=receiving&provider=dialmx")
 	settings := providerGroupHTML(t, dialogHTML(t, page.Body.String(), "domain-receiving-dialog-"+domain.ID), "dialmx")
@@ -919,7 +953,7 @@ func TestDialMXCustomReceivingAPIHasNoAntlerInstructions(t *testing.T) {
 }
 
 // stripDialMXReceiverTemplate removes the inert <template> that carries the
-// Receiver URLs field for an Antler MX setup, so an assertion can check that no
+// Receiver URLs field for a Tusk MX setup, so an assertion can check that no
 // editable input is rendered without tripping on the template's own input.
 func stripDialMXReceiverTemplate(settings string) string {
 	const open = `<template class="dialmx-receiver-urls-field">`

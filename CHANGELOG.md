@@ -39,6 +39,18 @@ All notable changes to MailMoose are documented here. This project follows
 
 ### Changed
 
+- **Tusk MX replaces Antler MX throughout the codebase (API change explicitly
+  approved).** Dial MX receiving configuration now uses `service: "tusk"`
+  instead of `"antler"`; receiving responses use `tusk_manifest` instead of
+  `antler_manifest`, including the browser setup responses. Stored receiver
+  metadata uses `tusk_receivers`, `tusk_manifest_source` and `tusk_manifest_at`.
+  Existing encrypted configurations are translated on read and persist the new
+  names on their next save, without changing receiver URLs, domain credentials
+  or setup identity. New setups fetch and embed the Tusk `endpoints.json`.
+  Identifiers, assets, tests, CI and documentation use Tusk naming. Clients must
+  update service values and manifest-field reads; the old service value is no
+  longer accepted in API writes. See **D157**.
+
 - **Unsupported-operation error code (API change explicitly approved).**
   Unsupported mailbox operations keep HTTP **409**, but return
   `code: "unsupported_operation"` instead of `conflict`. Ordinary conflicts

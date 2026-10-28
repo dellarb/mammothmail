@@ -44,7 +44,7 @@ jobs:
         run: go run golang.org/x/tools/cmd/deadcode@v0.51.0 ./... 2>&1 | tee ci-logs/deadcode.log
       - name: build
         run: go build -buildvcs=false ./cmd/... ./dialmx/cmd/... 2>&1 | tee ci-logs/build.log
-      # The Antler dialog interaction checks drive the real app.js closure against
+      # The Tusk dialog interaction checks drive the real app.js closure against
       # a DOM stand-in: timers, SSE listener attachment and footer payloads are
       # invisible to the Go suite. ubuntu-latest ships Node.
       - name: generated API reference
@@ -66,7 +66,7 @@ jobs:
         run: |
           set -o pipefail
           {
-            node tests/antler-wizard-check.cjs
+            node tests/tusk-wizard-check.cjs
             node tests/receiver-settings-check.cjs
             node tests/empty-trash-check.cjs
             node tests/release-config-check.cjs

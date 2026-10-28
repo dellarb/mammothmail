@@ -197,23 +197,23 @@ func TestUIStateDashboardLightReflectsExtraMX(t *testing.T) {
 	t.Parallel()
 	svc, _, u, domain, _ := httpFixture(t)
 	ctx := context.Background()
-	svc.AntlerEndpoints = fixedAntler{receivers: []mxdial.AntlerReceiver{
-		{ID: "antler-1", SessionURL: "https://antler1.example.test", SMTPHostname: "antler1.example.test", MXPriority: 10},
+	svc.TuskEndpoints = fixedTusk{receivers: []mxdial.TuskReceiver{
+		{ID: "tusk-1", SessionURL: "https://tusk1.example.test", SMTPHostname: "tusk1.example.test", MXPriority: 10},
 	}}
 	if _, _, err := svc.SaveDomainReceivingConfig(ctx, u.AccountID, domain.ID, "dialmx", map[string]any{
-		"service": mxdial.ServiceAntler, "contact_email": "ops@example.test",
+		"service": mxdial.ServiceTusk, "contact_email": "ops@example.test",
 	}, false); err != nil {
-		t.Fatalf("antler save: %v", err)
+		t.Fatalf("tusk save: %v", err)
 	}
 	// Mark the receiver ready so the aggregate reaches the extra-MX branch.
 	m := mxdial.New(svc.DialMXBackend(), mxdial.Config{DataDir: svc.Config.DataDir, AllowPrivateDestinations: true})
 	m.SetStatusForTest(domain.Name, []mxdial.Status{{
-		ReceiverURL: "https://antler1.example.test", State: mxdial.StatusActive, SMTPHostname: "antler1.example.test",
+		ReceiverURL: "https://tusk1.example.test", State: mxdial.StatusActive, SMTPHostname: "tusk1.example.test",
 	}})
 	svc.DialMX = m
 	// A counting resolver so the test can prove the HTTP snapshot never consults it.
 	res := &switchableResolver{}
-	res.set([]*net.MX{{Host: "antler1.example.test.", Pref: 10}}, nil)
+	res.set([]*net.MX{{Host: "tusk1.example.test.", Pref: 10}}, nil)
 	watchDNS(svc, res)
 	srv := httpapp.New(svc, nil)
 	h := srv.Handler()
@@ -239,12 +239,12 @@ func TestUIStateDashboardLightReflectsExtraMX(t *testing.T) {
 		return out.Domains[domain.ID].Light
 	}
 
-	// Only the Antler receiver is published: green.
+	// Only the Tusk receiver is published: green.
 	if got := light(); got != "ok" {
-		t.Fatalf("light with only the Antler receiver = %q, want ok", got)
+		t.Fatalf("light with only the Tusk receiver = %q, want ok", got)
 	}
 	// An extra MX record appears and the watcher republishes: amber.
-	res.set([]*net.MX{{Host: "antler1.example.test.", Pref: 10}, {Host: "old.example.test.", Pref: 20}}, nil)
+	res.set([]*net.MX{{Host: "tusk1.example.test.", Pref: 10}, {Host: "old.example.test.", Pref: 20}}, nil)
 	svc.DNS.CheckOnce(ctx)
 	if got := light(); got != "amber" {
 		t.Fatalf("light with an extra MX record = %q, want amber", got)

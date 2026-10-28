@@ -44,7 +44,7 @@ type domainConfigResponse struct {
 	// Instructions are the copy-ready DNS records for the setup (Dial MX only).
 	Instructions *dialMXDNSInstructions `json:"instructions,omitempty"`
 	// UnexpectedMX lists published MX hostnames that are not one of the domain's
-	// configured Antler receivers (Dial MX only). It is returned only when the
+	// configured Tusk receivers (Dial MX only). It is returned only when the
 	// caller asked for the published-record checks (?dns=1) and is independent of
 	// Instructions, so the dashboard's amber warning and the status dialog's
 	// warning are driven by the same single verdict.
@@ -54,11 +54,11 @@ type domainConfigResponse struct {
 	// verdict. The status dialog uses it to re-read instead of showing a stale
 	// "additional MX servers" warning until its next poll.
 	DNSStale bool `json:"dns_stale,omitempty"`
-	// AntlerManifest is where the domain's snapshotted Antler MX receiver set came
-	// from (Dial MX Antler only): github, cache or embedded, with the fetch time.
+	// TuskManifest is where the domain's snapshotted Tusk MX receiver set came
+	// from (Dial MX Tusk only): github, cache or embedded, with the fetch time.
 	// The setup dialog states it so an operator can tell a live GitHub fetch from
 	// the built-in defaults.
-	AntlerManifest *antlerManifestView `json:"antler_manifest,omitempty"`
+	TuskManifest *tuskManifestView `json:"tusk_manifest,omitempty"`
 }
 
 // mxdialStatusView mirrors mxdial.Status for JSON without importing its shape
@@ -96,11 +96,11 @@ type domainDNSView struct {
 }
 
 // dialMXDNSInstructions is the copy-ready DNS set for a domain's Dial MX
-// setup. For an Antler MX setup it lists both the MX records to publish and the
+// setup. For a Tusk MX setup it lists both the MX records to publish and the
 // TXT verification record; for a custom service it lists the TXT record and
 // leaves the MX hostnames to the operator.
 type dialMXDNSInstructions struct {
-	Service       string                `json:"service"` // "antler" | "custom"
+	Service       string                `json:"service"` // "tusk" | "custom"
 	Contact       string                `json:"contact_email,omitempty"`
 	Enforcement   string                `json:"enforcement,omitempty"`
 	InheritedFrom string                `json:"inherited_from,omitempty"`
@@ -418,7 +418,7 @@ func (s *Server) domainReceivingResponse(ctx context.Context, domainID string, c
 			resp.DNS = s.dialMXDNS(domainID)
 			resp.Instructions = view.instructionView()
 			resp.UnexpectedMX = s.dialMXExtraMX(domainID)
-			resp.AntlerManifest = view.Manifest
+			resp.TuskManifest = view.Manifest
 		}
 	}
 	return resp, nil

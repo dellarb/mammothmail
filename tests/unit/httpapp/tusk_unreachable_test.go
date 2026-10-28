@@ -11,25 +11,25 @@ import (
 	"github.com/dellarb/mailmoose/internal/transport/mxdial"
 )
 
-// TestDialMXAntlerUnreachableReceiverKeepsConnectorHostname proves the receiving
+// TestDialMXTuskUnreachableReceiverKeepsConnectorHostname proves the receiving
 // status keeps the configured connector hostname when a receiver the core cannot
 // reach advertises none. The status wizard matches each connector row to a
 // status row by smtp_hostname, so an empty hostname would strand the row on an
 // amber "Waiting" instead of showing the real red failure.
-func TestDialMXAntlerUnreachableReceiverKeepsConnectorHostname(t *testing.T) {
+func TestDialMXTuskUnreachableReceiverKeepsConnectorHostname(t *testing.T) {
 	t.Parallel()
 	svc, h, u, domain, _ := httpFixture(t)
 	ctx := context.Background()
-	svc.AntlerEndpoints = fixedAntler{receivers: []mxdial.AntlerReceiver{
-		{ID: "antler-1", SessionURL: "https://antler-unreachable.example.test", SMTPHostname: "antler-unreachable.example.test", MXPriority: 10},
+	svc.TuskEndpoints = fixedTusk{receivers: []mxdial.TuskReceiver{
+		{ID: "tusk-1", SessionURL: "https://tusk-unreachable.example.test", SMTPHostname: "tusk-unreachable.example.test", MXPriority: 10},
 	}}
 	if _, _, err := svc.SaveDomainReceivingConfig(ctx, u.AccountID, domain.ID, "dialmx", map[string]any{
-		"service": mxdial.ServiceAntler, "contact_email": "ops@example.test",
+		"service": mxdial.ServiceTusk, "contact_email": "ops@example.test",
 	}, false); err != nil {
-		t.Fatalf("antler save: %v", err)
+		t.Fatalf("tusk save: %v", err)
 	}
 
-	// A real manager dials the configured (unresolvable) Antler receiver, which
+	// A real manager dials the configured (unresolvable) Tusk receiver, which
 	// reports the domain as unreachable with no advertised SMTP hostname.
 	m := mxdial.New(svc.DialMXBackend(), mxdial.Config{
 		DataDir:                  svc.Config.DataDir,
@@ -83,7 +83,7 @@ func TestDialMXAntlerUnreachableReceiverKeepsConnectorHostname(t *testing.T) {
 	if row["state"] != mxdial.StatusUnreachable {
 		t.Fatalf("state = %v, want unreachable", row["state"])
 	}
-	if row["smtp_hostname"] != "antler-unreachable.example.test" {
+	if row["smtp_hostname"] != "tusk-unreachable.example.test" {
 		t.Fatalf("unreachable receiver lost its configured hostname: %v", row)
 	}
 }
