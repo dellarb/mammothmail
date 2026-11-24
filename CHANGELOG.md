@@ -35,6 +35,11 @@ All notable changes to Mammoth Mail are documented here. This project follows
 
 ### Fixed
 
+- **OpenClaw named accounts now validate.** The plugin manifest accepts the
+  account-scoped config written by `openclaw channels add --account`, while
+  requiring credentials for each named account and for any configured default
+  account.
+
 - **Dependency security bumps.** The OpenClaw plugin's runtime tree now resolves
   `minimatch` 11.x (clearing the minimatch DoS advisory) and `undici` 8.x (clearing
   the undici TLS and DoS advisories for the runtime tree). The plugin pins move to
