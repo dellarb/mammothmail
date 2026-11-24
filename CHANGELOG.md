@@ -40,6 +40,9 @@ All notable changes to Mammoth Mail are documented here. This project follows
   requiring credentials for each named account and for any configured default
   account.
 
+- **Adding a second OpenClaw connector preserves the first.** Existing default
+  connector credentials now move with the default account during promotion.
+
 - **Dependency security bumps.** The OpenClaw plugin's runtime tree now resolves
   `minimatch` 11.x (clearing the minimatch DoS advisory) and `undici` 8.x (clearing
   the undici TLS and DoS advisories for the runtime tree). The plugin pins move to

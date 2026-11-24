@@ -1,7 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { claimMammothMailSetupCode, mammothMailSetupAdapter, parseSetupCode } from "../src/setup.js";
+import { moveSingleAccountChannelSectionToDefaultAccount } from "openclaw/plugin-sdk/setup";
+import { resolveMammothMailAccount } from "../src/accounts.js";
+import {
+  claimMammothMailSetupCode,
+  mammothMailSetupAdapter,
+  mammothMailSetupContract,
+  parseSetupCode,
+} from "../src/setup.js";
 
 test("manifest accepts required credentials at the root or per named account", () => {
   const manifest = JSON.parse(
@@ -51,6 +58,45 @@ test("named-account setup writes credentials under accounts", () => {
       },
     },
   });
+});
+
+test("promotes the paired default before adding a named connector", () => {
+  const cfg = {
+    channels: {
+      mammothmail: {
+        enabled: true,
+        baseUrl: "https://first.example.com",
+        gatewayId: "first",
+        secret: "first-secret",
+        agentId: "agent",
+        allowFrom: ["alice@example.com"],
+      },
+    },
+  };
+  const promoted = moveSingleAccountChannelSectionToDefaultAccount({
+    cfg: cfg as never,
+    channelKey: "mammothmail",
+    setupSurface: mammothMailSetupContract,
+  });
+  const updated = mammothMailSetupContract.applyAccountConfig({
+    cfg: promoted,
+    accountId: "second",
+    input: {
+      baseUrl: "https://second.example.com",
+      gatewayId: "second",
+      secret: "second-secret",
+    },
+  });
+  const first = resolveMammothMailAccount({ cfg: updated, accountId: "default" });
+  const second = resolveMammothMailAccount({ cfg: updated, accountId: "second" });
+  assert.equal(first.baseUrl, "https://first.example.com");
+  assert.equal(first.gatewayId, "first");
+  assert.equal(first.secret, "first-secret");
+  assert.equal(first.agentId, "agent");
+  assert.deepEqual(first.allowFrom, ["alice@example.com"]);
+  assert.equal(second.baseUrl, "https://second.example.com");
+  assert.equal(second.gatewayId, "second");
+  assert.equal(second.secret, "second-secret");
 });
 
 test("parseSetupCode reads the base URL from a setup URL fragment", () => {
