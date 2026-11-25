@@ -35,6 +35,18 @@ All notable changes to Mammoth Mail are documented here. This project follows
 
 ### Fixed
 
+- **Mobile inbox layout.** The dashboard shows one compact row per inbox and
+  moves connector creation and inbox deletion into inbox settings. The mailbox
+  view puts Compose and a collapsible folder picker above the messages.
+
+- **Adding a second OpenClaw connector preserves the first.** Existing default
+  connector credentials now move with the default account during promotion.
+
+- **OpenClaw named accounts now validate.** The plugin manifest accepts the
+  account-scoped config written by `openclaw channels add --account`, while
+  requiring credentials for each named account and for any configured default
+  account.
+
 - **Dependency security bumps.** The OpenClaw plugin's runtime tree now resolves
   `minimatch` 11.x (clearing the minimatch DoS advisory) and `undici` 8.x (clearing
   the undici TLS and DoS advisories for the runtime tree). The plugin pins move to

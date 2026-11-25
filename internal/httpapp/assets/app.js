@@ -2177,7 +2177,7 @@
     button.classList.toggle('empty', !name);
     button.querySelector('.dashboard-row-group-name').textContent = name || 'Group';
     var label = table === 'inboxes' ? 'inbox' : 'client';
-    button.setAttribute('aria-label', 'Set group for ' + label + ' ' + (row.cells[0] ? row.cells[0].textContent.trim() : ''));
+    button.setAttribute('aria-label', 'Set group for ' + label + ' ' + (row.cells[0] ? row.cells[0].textContent.trim() : '') + (name ? '. Current group: ' + name : ''));
     button.title = name ? 'Group: ' + name : 'Set group';
   }
 
@@ -8417,6 +8417,20 @@ function generateBearerSecret() {
 (function () {
   var sidebar = document.querySelector('[data-sidebar]');
   if (!sidebar) { return; }
+  var toggle = sidebar.querySelector('.mailnav-toggle');
+  if (toggle) {
+    var current = sidebar.querySelector('a.folder.active');
+    if (current) {
+      var label = current.querySelector('.labelname') || current.firstChild;
+      var name = label.textContent.trim();
+      toggle.querySelector('span').textContent = name;
+      toggle.setAttribute('aria-label', name + ' — switch folder or label');
+    }
+    toggle.addEventListener('click', function () {
+      toggle.setAttribute('aria-expanded', String(toggle.getAttribute('aria-expanded') !== 'true'));
+    });
+    toggle.hidden = false;
+  }
   var inboxID = sidebar.getAttribute('data-inbox') || '';
   var folderNewDlg = document.getElementById('folder-new-dialog');
   var labelNewDlg = document.getElementById('label-new-dialog');
